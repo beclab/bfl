@@ -1,0 +1,54 @@
+package v1
+
+import (
+	"bytetrade.io/web3os/bfl/pkg/constants"
+)
+
+type UserInfo struct {
+	Name           string `json:"name"`
+	OwnerRole      string `json:"owner_role"`
+	TerminusName   string `json:"terminusName"`
+	IsEphemeral    bool   `json:"is_ephemeral"`
+	Zone           string `json:"zone"`
+	CreatedUser    string `json:"created_user"`
+	WizardComplete bool   `json:"wizard_complete"`
+	AccessLevel    *int   `json:"access_level,omitempty"`
+}
+
+type IPAddress struct {
+	IsNatted bool `json:"is_natted"`
+
+	Internal string `json:"internal"`
+
+	External string `json:"external"`
+
+	MasterInternalIP string `json:"masterInternalIP,omitempty"`
+
+	MasterExternalIP string `json:"masterExternalIP"`
+}
+
+type TerminusInfo struct {
+	TerminusName    string                 `json:"terminusName"`
+	WizardStatus    constants.WizardStatus `json:"wizardStatus"`
+	Selfhosted      bool                   `json:"selfhosted"`
+	TailScaleEnable bool                   `json:"tailScaleEnable"`
+	OsVersion       string                 `json:"osVersion"`
+	LoginBackground string                 `json:"loginBackground"`
+	Avatar          string                 `json:"avatar"`
+	TerminusID      string                 `json:"terminusId"`
+	UserDID         string                 `json:"did"`
+}
+
+type MyAppsParam struct {
+	IsLocal bool `json:"isLocal"`
+}
+
+type MyAppsProviderRequest struct {
+	Op       string      `json:"op"`
+	DataType string      `json:"datatype"`
+	Version  string      `json:"version"`
+	Group    string      `json:"group"`
+	Param    interface{} `json:"param,omitempty"`
+	Data     MyAppsParam `json:"data,omitempty"`
+	Token    string
+}

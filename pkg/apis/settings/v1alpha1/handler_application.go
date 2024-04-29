@@ -1,0 +1,514 @@
+package v1alpha1
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+
+	"bytetrade.io/web3os/bfl/internal/log"
+	"bytetrade.io/web3os/bfl/pkg/api"
+	"bytetrade.io/web3os/bfl/pkg/api/response"
+	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
+	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
+	"bytetrade.io/web3os/bfl/pkg/constants"
+	"bytetrade.io/web3os/bfl/pkg/utils"
+	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
+
+	"github.com/emicklei/go-restful/v3"
+	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
+)
+
+func (h *Handler) setupAppPolicy(req *restful.Request, resp *restful.Response) {
+	appname := req.PathParameter(ParamAppName)
+
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+
+	var policy app_service.ApplicationSettingsPolicy
+	err := req.ReadEntity(&policy)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	settings := app_service.ApplicationsSettings{
+		app_service.ApplicationSettingsPolicyKey: policy,
+	}
+
+	appServiceClient := app_service.NewAppServiceClient()
+
+	ret, err := appServiceClient.SetupAppPolicy(appname, token, settings)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	response.Success(resp, ret)
+}
+
+func (h *Handler) getAppPolicy(req *restful.Request, resp *restful.Response) {
+	appname := req.PathParameter(ParamAppName)
+
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+
+	appServiceClient := app_service.NewAppServiceClient()
+
+	settings, err := appServiceClient.GetAppPolicy(appname, token)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	policyStr, ok := settings[app_service.ApplicationSettingsPolicyKey]
+
+	if !ok {
+		response.HandleNotFound(resp, errors.New("no policy"))
+		return
+	}
+
+	var policy map[string]interface{}
+	err = json.Unmarshal([]byte(policyStr.(string)), &policy)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	response.Success(resp, policy)
+}
+
+func (h *Handler) setupAppCustomDomain(req *restful.Request, resp *restful.Response) {
+	appName := req.PathParameter(ParamAppName)
+	entranceName := req.PathParameter(ParamEntranceName)
+
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+
+	customDomain := make(map[string]interface{})
+	data, err := io.ReadAll(req.Request.Body)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	err = json.Unmarshal(data, &customDomain)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	var settings app_service.ApplicationsSettings
+	appServiceClient := app_service.NewAppServiceClient()
+
+	var terminusName, zone string
+	terminusName, zone, err = h.getUserInfo()
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	formatSettings := func(customDomainStore map[string]interface{}, needTargetCname, thirdLevelDomainName, thirdPartyDomainName string) {
+		customDomainStore[constants.ApplicationCustomDomainCnameTarget] = needTargetCname
+		customDomainStore[constants.ApplicationCustomDomainCnameTargetStatus] = ""
+		customDomainStore[constants.ApplicationCustomDomainCnameStatus] = ""
+		if thirdLevelDomainName != "" || thirdPartyDomainName != "" {
+			customDomainStore[constants.ApplicationThirdLevelDomain] = thirdLevelDomainName
+			customDomainStore[constants.ApplicationThirdPartyDomain] = thirdPartyDomainName
+		}
+	}
+
+	var reqCustomDomain = h.getCustomDomainValue(customDomain, constants.ApplicationThirdPartyDomain)
+
+	existsAppCustomDomain, err := h.getExistsCustomDomain(appServiceClient, appName, entranceName, token)
+
+	cm := certmanager.NewCertManager(constants.TerminusName(terminusName))
+
+	var operate = h.getCustomDomainOperation(reqCustomDomain, existsAppCustomDomain)
+	log.Infof("setAppCustomDomain: app: %s-%s, reqDomain: %s, existsDomain: %s, operate: %d, req: %s",
+		appName, entranceName, reqCustomDomain, existsAppCustomDomain, operate, utils.ToJSON(customDomain))
+
+	switch operate {
+	case constants.CustomDomainIgnore, constants.CustomDomainCheck:
+		ret, _ := appServiceClient.GetAppCustomDomain(appName, token)
+		entranceCustomDomainStr, ok := ret[constants.ApplicationCustomDomain]
+		if !ok {
+			formatSettings(customDomain, zone, "", "")
+			break
+		}
+		var entrancesCustomDomainM = make(map[string]interface{})
+		err := json.Unmarshal([]byte(entranceCustomDomainStr.(string)), &entrancesCustomDomainM)
+		if err != nil {
+			response.HandleError(resp, err)
+			return
+		}
+		entranceCustomDomainM, ok := entrancesCustomDomainM[entranceName]
+		if !ok {
+			formatSettings(customDomain, zone, "", "")
+		} else {
+			entranceCustomDomainMap := entranceCustomDomainM.(map[string]interface{})
+			cnameTarget := h.getCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameTarget)
+			reqThirdLevel := h.getCustomDomainValue(customDomain, constants.ApplicationThirdLevelDomain)
+			existsThirdLevel := h.getCustomDomainValue(entranceCustomDomainMap, constants.ApplicationThirdLevelDomain)
+			if cnameTarget == "" {
+				h.setCustomDomainValue(entranceCustomDomainMap, constants.ApplicationCustomDomainCnameTarget, zone)
+			}
+			if existsThirdLevel != reqThirdLevel {
+				h.setCustomDomainValue(entranceCustomDomainMap, constants.ApplicationThirdLevelDomain, reqThirdLevel)
+			}
+			customDomain = entranceCustomDomainMap
+		}
+	case constants.CustomDomainDelete, constants.CustomDomainUpdate:
+		_, err := cm.DeleteCustomDomainOnCloudflare(existsAppCustomDomain)
+		if err != nil {
+			log.Errorf("setAppCustomDomain: app: %s-%s, delete custom domain error %v", appName, entranceName, err)
+			response.HandleError(resp, err)
+			return
+		}
+		fallthrough
+	case constants.CustomDomainAdd:
+		formatSettings(customDomain, zone, "", "")
+		if operate == constants.CustomDomainUpdate || operate == constants.CustomDomainAdd {
+			h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameTargetStatus, constants.CustomDomainCnameStatusNotset)
+			h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameStatus, constants.CustomDomainCnameStatusNotset)
+		}
+	}
+
+	settings = app_service.ApplicationsSettings{
+		app_service.ApplicationSettingsDomainKey: customDomain,
+	}
+	ret, err := appServiceClient.SetupAppCustomDomain(appName, entranceName, token, settings)
+	log.Infof("setAppCustomDomain: app: %s-%s, ret: %s", appName, entranceName, utils.ToJSON(ret))
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	response.Success(resp, ret)
+	return
+}
+
+func (h *Handler) finishAppCustomDomainCnameTarget(req *restful.Request, resp *restful.Response) {
+	appName := req.PathParameter(ParamAppName)
+	entranceName := req.PathParameter(ParamEntranceName)
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	var err error
+
+	var settings app_service.ApplicationsSettings
+	appServiceClient := app_service.NewAppServiceClient()
+	ret, _ := appServiceClient.GetAppCustomDomain(appName, token)
+	if ret == nil {
+		response.HandleError(resp, errors.New("app custom domain not found"))
+		return
+	}
+
+	entranceCustomDomainStr, ok := ret[constants.ApplicationCustomDomain]
+	if !ok {
+		response.HandleError(resp, errors.New("app custom domain not found"))
+		return
+	}
+
+	var entrancesCustomDomainM = make(map[string]interface{})
+	if err = json.Unmarshal([]byte(entranceCustomDomainStr.(string)), &entrancesCustomDomainM); err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	entranceCustomDomainM, ok := entrancesCustomDomainM[entranceName]
+	if !ok {
+		response.HandleError(resp, errors.New("app custom domain not found"))
+		return
+	}
+
+	entranceCustomDomainMap := entranceCustomDomainM.(map[string]interface{})
+	thirdPartyValue := entranceCustomDomainMap[constants.ApplicationThirdPartyDomain]
+	if thirdPartyValue == nil {
+		response.HandleError(resp, errors.New("app not set custom domain"))
+		return
+	}
+
+	if thirdPartyValue.(string) == "" {
+		response.HandleError(resp, errors.New("app not set custom domain"))
+		return
+	}
+
+	entranceCustomDomainMap[constants.ApplicationCustomDomainCnameTargetStatus] = constants.CustomDomainCnameStatusSet
+	entranceCustomDomainMap[constants.ApplicationCustomDomainCnameStatus] = constants.CustomDomainCnameStatusPending
+
+	settings = app_service.ApplicationsSettings{
+		app_service.ApplicationSettingsDomainKey: entranceCustomDomainMap,
+	}
+	r, err := appServiceClient.SetupAppCustomDomain(appName, entranceName, token, settings)
+	log.Infof("finishAppCustomDomainCnameTarget: app: %s-%s, ret: %s", appName, entranceName, utils.ToJSON(r))
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	response.Success(resp, nil)
+	return
+}
+
+func (h *Handler) getAppCustomDomain(req *restful.Request, resp *restful.Response) {
+	appname := req.PathParameter(ParamAppName)
+
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+
+	appServiceClient := app_service.NewAppServiceClient()
+	entrances, err := appServiceClient.GetAppEntrances(appname, token)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	if entrances == nil || len(entrances) == 0 {
+		response.HandleError(resp, fmt.Errorf("app %s entrances not found", appname))
+		return
+	}
+
+	var zone string
+	_, zone, err = h.getUserInfo()
+	settings, err := appServiceClient.GetAppCustomDomain(appname, token)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	getEntrancesDefaultResp := func() map[string]interface{} {
+		var res = make(map[string]interface{})
+		for _, entrancemap := range entrances {
+			var r = make(map[string]interface{})
+			var ename = entrancemap["name"].(string)
+			r[constants.ApplicationThirdLevelDomain] = ""
+			r[constants.ApplicationThirdPartyDomain] = ""
+			r[constants.ApplicationCustomDomainCnameTarget] = zone
+			r[constants.ApplicationCustomDomainCnameStatus] = ""
+			r[constants.ApplicationCustomDomainCnameTargetStatus] = ""
+			res[ename] = r
+		}
+		return res
+	}
+
+	appDomain, ok := settings[app_service.ApplicationSettingsDomainKey]
+	if !ok {
+		response.Success(resp, getEntrancesDefaultResp())
+		return
+	}
+
+	var appDomainMap = make(map[string]interface{})
+	if err = json.Unmarshal([]byte(appDomain.(string)), &appDomainMap); err != nil {
+		log.Errorf("getAppCustomDomain: unmarshal customDomain error %v, %s", err, appDomain.(string))
+		response.HandleError(resp, err)
+		return
+	}
+
+	response.Success(resp, appDomainMap)
+}
+
+func (h *Handler) getAppEntrances(req *restful.Request, resp *restful.Response) {
+	appName := req.PathParameter(ParamAppName)
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+
+	appServiceClient := app_service.NewAppServiceClient()
+
+	entrances, err := appServiceClient.GetAppEntrances(appName, token)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	response.Success(resp, api.NewListResult(entrances))
+}
+
+func (h *Handler) setupAppAuthorizationLevel(req *restful.Request, resp *restful.Response) {
+	appName := req.PathParameter(ParamAppName)
+	entranceName := req.PathParameter(ParamEntranceName)
+
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+
+	authLevel := make(map[string]interface{})
+	data, err := io.ReadAll(req.Request.Body)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	defer req.Request.Body.Close()
+	err = json.Unmarshal(data, &authLevel)
+
+	settings := app_service.ApplicationsSettings{
+		app_service.ApplicationAuthorizationLevelKey: authLevel,
+	}
+
+	appServiceClient := app_service.NewAppServiceClient()
+
+	ret, err := appServiceClient.SetupAppAuthorizationLevel(appName, entranceName, token, settings)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	response.Success(resp, ret)
+}
+
+func (h *Handler) setupAppEntrancePolicy(req *restful.Request, resp *restful.Response) {
+	appName := req.PathParameter(ParamAppName)
+	entranceName := req.PathParameter(ParamEntranceName)
+
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+
+	var policy app_service.ApplicationSettingsPolicy
+	err := req.ReadEntity(&policy)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	settings := app_service.ApplicationsSettings{
+		app_service.ApplicationSettingsPolicyKey: policy,
+	}
+
+	appServiceClient := app_service.NewAppServiceClient()
+
+	ret, err := appServiceClient.SetupAppEntrancePolicy(appName, entranceName, token, settings)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	response.Success(resp, ret)
+}
+
+func (h *Handler) getUserInfo() (string, string, error) {
+	var terminusName string
+	var zone string
+	var err error
+	var op *operator.UserOperator
+	var user *iamV1alpha2.User
+
+	op, err = operator.NewUserOperator()
+	user, err = op.GetUser(constants.Username)
+	if err != nil {
+		return "", "", fmt.Errorf("new user operator, and get user err: %v", err)
+	}
+
+	terminusName = op.GetTerminusName(user)
+	if terminusName == "" {
+		return "", "", fmt.Errorf("no terminus naame has binding")
+	}
+
+	zone = op.GetUserZone(user)
+	if zone == "" {
+		return "", "", fmt.Errorf("no zone has binding")
+	}
+
+	return terminusName, zone, nil
+}
+
+func (h *Handler) getCustomDomainOperation(_reqCustomDomain, _existsAppCustomDomain string) constants.CustomDomain {
+	switch {
+	case _reqCustomDomain != "" && _existsAppCustomDomain == "":
+		return constants.CustomDomainAdd
+	case _reqCustomDomain != "" && _existsAppCustomDomain != "" && _reqCustomDomain != _existsAppCustomDomain:
+		return constants.CustomDomainUpdate
+	case _reqCustomDomain == "" && _existsAppCustomDomain != "":
+		return constants.CustomDomainDelete
+	case _reqCustomDomain != "" && _reqCustomDomain == _existsAppCustomDomain:
+		return constants.CustomDomainCheck
+	case _reqCustomDomain == "" && _reqCustomDomain == _existsAppCustomDomain:
+		fallthrough
+	default:
+		return constants.CustomDomainIgnore
+	}
+}
+
+func (h *Handler) getExistsCustomDomain(appServiceClient *app_service.Client, appName, entranceName, token string) (string, error) {
+	appCustomDomainExists, err := appServiceClient.GetAppCustomDomain(appName, token)
+	if err != nil {
+		log.Errorf("app found error: %+v", err)
+		return "", err
+	}
+
+	if appCustomDomainExists == nil {
+		return "", fmt.Errorf("app %s not found", appName)
+	}
+
+	existsAppCustomDomain, ok := appCustomDomainExists[constants.ApplicationCustomDomain]
+	if !ok {
+		return "", nil
+	}
+	var custdomDomainEntrances = make(map[string]map[string]string)
+	if err = json.Unmarshal([]byte(existsAppCustomDomain.(string)), &custdomDomainEntrances); err != nil {
+		return "", nil
+	}
+
+	custdomDomainEntrance, ok := custdomDomainEntrances[entranceName]
+	if !ok {
+		return "", nil
+	}
+	return custdomDomainEntrance[constants.ApplicationThirdPartyDomain], nil
+}
+
+func (h *Handler) updateAppCustomDomain(cm certmanager.Interface, entranceName string, customDomain map[string]interface{}) map[string]interface{} {
+	var thirdParty = h.getCustomDomainValue(customDomain, constants.ApplicationThirdPartyDomain)
+	if thirdParty == "" {
+		return nil
+	}
+
+	cnameStatus, err := cm.GetCustomDomainCnameStatus(thirdParty)
+	if err != nil {
+		h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameTargetStatus, constants.CustomDomainCnameStatusNotset)
+		h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameStatus, constants.CustomDomainCnameStatusNotset)
+		return customDomain
+	}
+	log.Infof("reloadAppCustomDomain: get cname status %v, entranceName: %s", cnameStatus.Success, entranceName)
+	if !cnameStatus.Success {
+		h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameTargetStatus, constants.CustomDomainCnameStatusNotset)
+		h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameStatus, constants.CustomDomainCnameStatusNotset)
+		return customDomain
+	}
+
+	getStatus, _ := cm.GetCustomDomainOnCloudflare(thirdParty)
+	if getStatus != nil {
+		log.Infof("reloadAppCustomDomain: get ssl status ssl: %s  hostname: %s, entranceName: %s", getStatus.SSLStatus, getStatus.HostnameStatus, entranceName)
+		h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameTargetStatus, constants.CustomDomainCnameStatusSet)
+		h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameStatus, h.setCustomDomainCnameStatus(getStatus.SSLStatus, getStatus.HostnameStatus))
+		return customDomain
+	}
+
+	_, err = cm.AddCustomDomainOnCloudflare(thirdParty)
+	if err != nil {
+		log.Errorf("reloadAppCustomDomain: add custom domain error %v", err)
+	}
+
+	h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameTargetStatus, constants.CustomDomainCnameStatusSet)
+	h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameStatus, constants.CustomDomainCnameStatusPending)
+
+	return customDomain
+}
+
+func (h *Handler) getCustomDomainValue(data map[string]interface{}, key string) string {
+	v, ok := data[key]
+	if !ok {
+		return ""
+	}
+	return v.(string)
+}
+
+func (h *Handler) setCustomDomainValue(data map[string]interface{}, key string, val string) {
+	if data == nil {
+		return
+	}
+	_, ok := data[key]
+	if ok {
+		data[key] = val
+	}
+}
+
+func (h *Handler) setCustomDomainCnameStatus(sslStatus, hostnameStatus string) string {
+	switch {
+	case hostnameStatus == sslStatus && sslStatus == "active":
+		return constants.CustomDomainCnameStatusActive
+	default:
+		return constants.CustomDomainCnameStatusPending
+	}
+}

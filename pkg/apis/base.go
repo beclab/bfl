@@ -1,0 +1,79 @@
+package apis
+
+import (
+	"fmt"
+
+	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
+	"bytetrade.io/web3os/bfl/pkg/constants"
+
+	"github.com/emicklei/go-restful/v3"
+)
+
+type Base struct {
+}
+
+func (b *Base) GetAppViaToken(req *restful.Request, appService *app_service.Client) (string, []*app_service.AppInfo, error) {
+	user := req.Attribute(constants.UserContextAttribute).(string)
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	apps, err := appService.ListAppInfosByOwner(token)
+
+	return user, apps, err
+
+}
+
+func (b *Base) GetAppViaOwner(appService *app_service.Client) (string, []*app_service.AppInfo, error) {
+	apps, err := appService.ListAppInfosByUser(constants.Username)
+
+	return constants.Username, apps, err
+}
+
+func (h *Base) GetAppListAndServicePort(req *restful.Request, appService *app_service.Client, getApps func() (string, []*app_service.AppInfo, error)) ([]*app_service.AppInfo, error) {
+
+	user, apps, err := getApps()
+	if err != nil {
+		return nil, err
+	}
+
+	appURL, err := app_service.AppUrlGenerator(req, user)
+	if err != nil {
+		return nil, err
+	}
+
+	appURLMulti, err := app_service.AppUrlGeneratorMultiEntrance(req, user)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, app := range apps {
+		apps[i].URL = appURL(app.Name, app.ID)
+
+		if len(apps[i].Entrances) == 0 {
+			continue
+		}
+
+		if len(apps[i].Entrances) == 1 {
+			apps[i].Entrances[0].ID = app.ID
+			apps[i].Entrances[0].URL = app.URL
+			if apps[i].Entrances[0].Icon == "" {
+				apps[i].Entrances[0].Icon = app.Icon
+			}
+			continue
+		}
+
+		// return all entrances, let the frontend filter invisible or not
+		// filteredEntrances := make([]app_service.Entrance, 0)
+		for j := range apps[i].Entrances {
+			apps[i].Entrances[j].ID = fmt.Sprintf("%s%d", app.ID, j)
+			apps[i].Entrances[j].URL = appURLMulti(app.Name, app.ID, j)
+			if apps[i].Entrances[j].Icon == "" {
+				apps[i].Entrances[j].Icon = app.Icon
+			}
+			// if !apps[i].Entrances[j].Invisible {
+			// 	filteredEntrances = append(filteredEntrances, apps[i].Entrances[j])
+			// }
+		}
+		//		apps[i].Entrances = filteredEntrances
+	}
+
+	return apps, nil
+}

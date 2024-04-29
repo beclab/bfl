@@ -1,0 +1,32 @@
+FROM golang:1.18 as builder
+
+WORKDIR /workspace
+
+ENV ksVersion=v3.3.0
+
+
+# Copy the Go Modules manifests
+COPY go.mod bytetrade.io/web3os/bfl-frpc/go.mod
+COPY go.sum bytetrade.io/web3os/bfl-frpc/go.sum
+
+RUN git clone https://github.com/beclab/kubesphere-ext.git bytetrade.io/kubesphere-ext && \
+  cd bytetrade.io/kubesphere-ext && \
+  git checkout -b $ksVersion
+
+
+RUN cd bytetrade.io/web3os/bfl-frpc && \
+  go mod download
+
+
+# Copy the go project
+COPY . bytetrade.io/web3os/bfl-frpc/
+
+RUN cd bytetrade.io/web3os/bfl-frpc/ && \
+  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -a -o frpc-agent cmd/frpc/main.go
+
+FROM beclab/frpc-base:v0.56.0
+WORKDIR /
+COPY --from=builder /workspace/bytetrade.io/web3os/bfl-frpc/frpc-agent .
+RUN ln -s /usr/bin/frpc
+
+ENTRYPOINT ["/frpc-agent"]
