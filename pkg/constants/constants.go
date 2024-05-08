@@ -125,8 +125,9 @@ var (
 
 	L4ProxyServiceAccountName = "os-internal" // "kubesphere"
 
-	L4ProxyImage = "beclab/l4-bfl-proxy"
-	FrpcImage    = "beclab/frpc"
+	L4ProxyImage     = "beclab/l4-bfl-proxy"
+	FrpcImage        = "beclab/frpc"
+	CloudflaredImage = "cloudflare/cloudflared"
 
 	ApplyPatchFieldManager = "application/apply-patch"
 

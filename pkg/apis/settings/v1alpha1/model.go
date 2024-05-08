@@ -26,6 +26,10 @@ var (
 
 	L4ProxyDeploymentReplicas int32 = 1
 
+	CloudflaredDeploymentName = "cloudflare-tunnel"
+
+	CloudflareDeploymentReplicas int32 = 1
+
 	FrpConfigTmpl = `
 {{ $l4ProxySSLPort := .L4ProxySSLPort }}	
 
@@ -111,8 +115,9 @@ type PostTerminusName struct {
 }
 
 type PostEnableSSL struct {
-	FrpServer string `json:"frp_server"`
-	IP        string `json:"ip"`
+	FrpServer    string `json:"frp_server"`
+	IP           string `json:"ip"`
+	EnableTunnel bool   `json:"enable_tunnel"`
 }
 
 type ServiceStatus struct {
@@ -139,6 +144,20 @@ type PublicDomainAccessPolicy struct {
 type PostLocale struct {
 	Language string `json:"language"`
 	Location string `json:"location"`
+}
+
+type TunnelRequest struct {
+	Name    string `json:"name"`
+	Service string `json:"service"`
+}
+
+type TunnelResponseData struct {
+	Token string `json:"token"`
+}
+
+type TunnelResponse struct {
+	Success bool                `json:"success"`
+	Data    *TunnelResponseData `json:"data"`
 }
 
 func parseFrpConfig(terminusName constants.TerminusName, frpServer string) (string, string, error) {
@@ -383,117 +402,59 @@ func NewFrpDeploymentApplyConfiguration(frpConfig string, frpServer string) appl
 	}
 }
 
-// func NewFrpDeploymentApplyConfiguration(frpConfig string) applyAppsv1.DeploymentApplyConfiguration {
-// 	volumeName := "frp-config"
-// 	imagePullPolicy := corev1.PullIfNotPresent
+func NewCloudflareDeploymentApplyConfiguration(token string) applyAppsv1.DeploymentApplyConfiguration {
+	imagePullPolicy := corev1.PullIfNotPresent
 
-// 	return applyAppsv1.DeploymentApplyConfiguration{
-// 		TypeMetaApplyConfiguration: applyMetav1.TypeMetaApplyConfiguration{
-// 			Kind:       pointer.String("Deployment"),
-// 			APIVersion: pointer.String(appsv1.SchemeGroupVersion.String()),
-// 		},
-// 		ObjectMetaApplyConfiguration: &applyMetav1.ObjectMetaApplyConfiguration{
-// 			Name:      pointer.String(FrpDeploymentName),
-// 			Namespace: pointer.String(constants.Namespace),
-// 			Labels: map[string]string{
-// 				"app": FrpDeploymentName,
-// 			},
-// 			Annotations: nil,
-// 		},
-// 		Spec: &applyAppsv1.DeploymentSpecApplyConfiguration{
-// 			Replicas: pointer.Int32(FrpDeploymentReplicas),
+	imageVersion := utils.EnvOrDefault("CLOUDFLARED_IMAGE_VERSION", "latest")
+	imageName := fmt.Sprintf("%s:%s", utils.EnvOrDefault("CLOUDFLARED_IMAGE_NAME", constants.CloudflaredImage), imageVersion)
 
-// 			Selector: &applyMetav1.LabelSelectorApplyConfiguration{
-// 				MatchLabels: map[string]string{
-// 					"app": FrpDeploymentName,
-// 				},
-// 			},
-// 			Template: &applyCorev1.PodTemplateSpecApplyConfiguration{
-// 				ObjectMetaApplyConfiguration: &applyMetav1.ObjectMetaApplyConfiguration{
-// 					Labels: map[string]string{
-// 						"app": FrpDeploymentName,
-// 					},
-// 				},
-// 				Spec: &applyCorev1.PodSpecApplyConfiguration{
-// 					Volumes: []applyCorev1.VolumeApplyConfiguration{
-// 						{
-// 							Name: pointer.String(volumeName),
-// 							VolumeSourceApplyConfiguration: applyCorev1.VolumeSourceApplyConfiguration{
-// 								EmptyDir: &applyCorev1.EmptyDirVolumeSourceApplyConfiguration{},
-// 							},
-// 						},
-// 					},
-// 					InitContainers: []applyCorev1.ContainerApplyConfiguration{
-// 						{
-// 							Name:            pointer.String("init"),
-// 							Image:           pointer.String("curlimages/curl:8.2.0"),
-// 							ImagePullPolicy: &imagePullPolicy,
-// 							Command: []string{
-// 								"/bin/sh",
-// 								"-c",
-// 								`echo "$CONFIG" > /etc/frp/frpc.ini
-// 									while :; do
-// 									ip=$(curl --connect-timeout 1 -sS 'http://bfl/bfl/backend/v1/ip?master=true')
-// 									if [ x"$ip" != "x" ]; then
-// 										echo "got master node ip: $ip"
-// 										sed -i "/local_ip/s@local_ip.*@local_ip = $ip@g" /etc/frp/frpc.ini
-// 										break
-// 									fi
-// 									sleep 2
-// 								done`,
-// 							},
-// 							Env: []applyCorev1.EnvVarApplyConfiguration{
-// 								{
-// 									Name:  pointer.String("CONFIG"),
-// 									Value: pointer.String(frpConfig),
-// 								},
-// 							},
-// 							VolumeMounts: []applyCorev1.VolumeMountApplyConfiguration{
-// 								{
-// 									Name:      pointer.String(volumeName),
-// 									MountPath: pointer.String("/etc/frp"),
-// 								},
-// 							},
-// 						},
-// 					},
-// 					Containers: []applyCorev1.ContainerApplyConfiguration{
-// 						{
-// 							Name:            pointer.String("agent"),
-// 							Image:           pointer.String("libtorrent/frpc:v0.44.0"),
-// 							ImagePullPolicy: &imagePullPolicy,
-// 							Command: []string{
-// 								"/frpc", "-c", "/etc/frp/frpc.ini",
-// 							},
-// 							StartupProbe: &applyCorev1.ProbeApplyConfiguration{
-// 								HandlerApplyConfiguration: applyCorev1.HandlerApplyConfiguration{
-// 									Exec: &applyCorev1.ExecActionApplyConfiguration{Command: []string{
-// 										"/bin/sh", "-c", "test -f /etc/frp/frpc.ini",
-// 									}}},
-// 							},
-// 							LivenessProbe: &applyCorev1.ProbeApplyConfiguration{
-// 								HandlerApplyConfiguration: applyCorev1.HandlerApplyConfiguration{
-// 									Exec: &applyCorev1.ExecActionApplyConfiguration{
-// 										Command: []string{
-// 											"/bin/sh", "-c", "/usr/bin/pgrep -x /frpc",
-// 										},
-// 									},
-// 								},
-// 								FailureThreshold:    pointer.Int32(8),
-// 								InitialDelaySeconds: pointer.Int32(3),
-// 								PeriodSeconds:       pointer.Int32(5),
-// 								TimeoutSeconds:      pointer.Int32(10),
-// 							},
-// 							VolumeMounts: []applyCorev1.VolumeMountApplyConfiguration{
-// 								{
-// 									Name:      pointer.String(volumeName),
-// 									MountPath: pointer.String("/etc/frp"),
-// 									ReadOnly:  pointer.Bool(false),
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 		},
-// 	}
-// }
+	return applyAppsv1.DeploymentApplyConfiguration{
+		TypeMetaApplyConfiguration: applyMetav1.TypeMetaApplyConfiguration{
+			Kind:       pointer.String("Deployment"),
+			APIVersion: pointer.String(appsv1.SchemeGroupVersion.String()),
+		},
+		ObjectMetaApplyConfiguration: &applyMetav1.ObjectMetaApplyConfiguration{
+			Name:      pointer.String(CloudflaredDeploymentName),
+			Namespace: pointer.String(constants.Namespace),
+			Labels: map[string]string{
+				"app":                                  CloudflaredDeploymentName,
+				"applications.app.bytetrade.io/author": constants.AnnotationGroup,
+				"applications.app.bytetrade.io/owner":  constants.Username,
+			},
+			Annotations: map[string]string{},
+		},
+		Spec: &applyAppsv1.DeploymentSpecApplyConfiguration{
+			Replicas: pointer.Int32(CloudflareDeploymentReplicas),
+
+			Selector: &applyMetav1.LabelSelectorApplyConfiguration{
+				MatchLabels: map[string]string{
+					"app": CloudflaredDeploymentName,
+				},
+			},
+			Template: &applyCorev1.PodTemplateSpecApplyConfiguration{
+				ObjectMetaApplyConfiguration: &applyMetav1.ObjectMetaApplyConfiguration{
+					Labels: map[string]string{
+						"app": CloudflaredDeploymentName,
+					},
+				},
+				Spec: &applyCorev1.PodSpecApplyConfiguration{
+					SchedulerName: pointer.String("default-scheduler"),
+					Containers: []applyCorev1.ContainerApplyConfiguration{
+						{
+							Name:            pointer.String("tunnel"),
+							Image:           pointer.String(imageName),
+							ImagePullPolicy: &imagePullPolicy,
+							Args: []string{
+								"tunnel",
+								"--no-autoupdate",
+								"run",
+								"--token",
+								token,
+							},
+						},
+					}, // end of pod containers
+				}, //end of pod template spec
+			}, // end of pod template
+		}, // end of deployment spec
+	}
+}
