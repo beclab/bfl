@@ -192,6 +192,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 			if e := userOp.UpdateUser(user, []func(*iamV1alpha2.User){
 				func(u *iamV1alpha2.User) {
 					u.Annotations[constants.UserTerminusWizardStatus] = string(constants.NetworkActivateFailed)
+					u.Annotations[constants.EnableSSLTaskResultAnnotationKey] = settingsTask.TaskResult{State: settingsTask.Failed}.String()
 				},
 			}); e != nil {
 				klog.Errorf("update user err, %v", err)
@@ -249,7 +250,8 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 
 	if (post.IP == "" && post.FrpServer == "" && !post.EnableTunnel) ||
 		(post.IP != "" && post.FrpServer != "" && post.EnableTunnel) {
-		response.HandleError(resp, errors.New("enable https: invalid parameter, 'frp_server' or 'ip' or 'enable_tunnel' must be provided"))
+		err = errors.New("enable https: invalid parameter, 'frp_server' or 'ip' or 'enable_tunnel' must be provided")
+		response.HandleError(resp, err)
 		return
 	}
 
@@ -368,14 +370,16 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		}
 
 		if res.StatusCode() != http.StatusOK {
-			response.HandleError(resp, errors.New(string(res.Body())))
+			err = errors.New(string(res.Body()))
+			response.HandleError(resp, err)
 			return
 		}
 
 		responseData := res.Result().(*TunnelResponse)
 		if !responseData.Success || responseData.Data == nil || responseData.Data.Token == "" {
 			log.Errorf("get cloudflare tunnel token failed, %v", responseData)
-			response.HandleError(resp, errors.Errorf("enable https: get cloudflare tunnel token failed"))
+			err = errors.Errorf("enable https: get cloudflare tunnel token failed")
+			response.HandleError(resp, err)
 			return
 		}
 
