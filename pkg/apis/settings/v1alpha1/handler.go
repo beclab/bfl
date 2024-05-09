@@ -247,8 +247,9 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 
 	log.Infow("enable https: post request,", "postBody", post)
 
-	if (post.IP == "" && post.FrpServer == "") || (post.IP != "" && post.FrpServer != "") {
-		response.HandleError(resp, errors.New("enable https: invalid parameter, 'frp_server' or 'ip' must be provided"))
+	if (post.IP == "" && post.FrpServer == "" && !post.EnableTunnel) ||
+		(post.IP != "" && post.FrpServer != "" && post.EnableTunnel) {
+		response.HandleError(resp, errors.New("enable https: invalid parameter, 'frp_server' or 'ip' or 'enable_tunnel' must be provided"))
 		return
 	}
 
