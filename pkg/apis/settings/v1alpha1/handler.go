@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
@@ -191,6 +192,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 			if e := userOp.UpdateUser(user, []func(*iamV1alpha2.User){
 				func(u *iamV1alpha2.User) {
 					u.Annotations[constants.UserTerminusWizardStatus] = string(constants.NetworkActivateFailed)
+					u.Annotations[constants.EnableSSLTaskResultAnnotationKey] = settingsTask.TaskResult{State: settingsTask.Failed}.String()
 				},
 			}); e != nil {
 				klog.Errorf("update user err, %v", err)
@@ -246,8 +248,10 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 
 	log.Infow("enable https: post request,", "postBody", post)
 
-	if (post.IP == "" && post.FrpServer == "") || (post.IP != "" && post.FrpServer != "") {
-		response.HandleError(resp, errors.New("enable https: invalid parameter, 'frp_server' or 'ip' must be provided"))
+	if (post.IP == "" && post.FrpServer == "" && !post.EnableTunnel) ||
+		(post.IP != "" && post.FrpServer != "" && post.EnableTunnel) {
+		err = errors.New("enable https: invalid parameter, 'frp_server' or 'ip' or 'enable_tunnel' must be provided")
+		response.HandleError(resp, err)
 		return
 	}
 
@@ -257,6 +261,8 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		AccessToken:               req.HeaderParameter(constants.AuthorizationTokenKey),
 		FrpDeploymentName:         FrpDeploymentName,
 		FrpDeploymentReplicas:     1,
+		TunnelDeploymentName:      CloudflaredDeploymentName,
+		TunnelDeploymentReplicas:  1,
 		L4ProxyDeploymentName:     L4ProxyDeploymentName,
 		L4ProxyDeploymentReplicas: 1,
 	}
@@ -268,11 +274,11 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 	k8sClient := runtime.NewKubeClient(req).Kubernetes()
 
 	app, err := k8sClient.AppsV1().Deployments(namespace).Get(ctx, L4ProxyDeploymentName, metav1.GetOptions{})
+	portStr := utils.EnvOrDefault("L4_PROXY_LISTEN", constants.L4ListenSSLPort)
 	if (err != nil && apierrors.IsNotFound(err)) || app == nil {
 		log.Warnf("get l4-proxy deployment err: %v, recreate it", err)
 
 		var portInt int
-		portStr := utils.EnvOrDefault("L4_PROXY_LISTEN", constants.L4ListenSSLPort)
 		port, _ := strconv.Atoi(portStr)
 		portInt = port
 
@@ -295,10 +301,12 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		return
 	}
 	o.LocalNodeIP = nodeIP
+	o.LocalNodePort = &portStr
 
-	if post.IP != "" {
+	switch {
+	case post.IP != "":
 		o.PublicDomainIP = pointer.String(post.IP)
-	} else {
+	case post.FrpServer != "":
 		var domain, frpConfig string
 
 		err = func() error {
@@ -333,6 +341,61 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		o.FrpServer = post.FrpServer
 
 		log.Debugf("created frp deployment: %s", utils.PrettyJSON(createdFrp))
+	case post.EnableTunnel:
+		// get cloudflare token
+		jws := userOp.GetUserAnnotation(user, constants.UserCertManagerJWSToken)
+		if jws == "" {
+			response.HandleError(resp, errors.Errorf("enable https: user jws not found"))
+			return
+		}
+
+		req := TunnelRequest{
+			Name:    terminusName,
+			Service: fmt.Sprintf("https://%s:%s", *o.LocalNodeIP, *o.LocalNodePort),
+		}
+
+		res, err := h.httpClient.R().
+			SetHeaders(map[string]string{
+				restful.HEADER_ContentType: restful.MIME_JSON,
+				restful.HEADER_Accept:      restful.MIME_JSON,
+				"Authorization":            "Bearer " + jws,
+			}).
+			SetBody(req).
+			SetResult(&TunnelResponse{}).
+			Post("https://terminus-dnsop.snowinning.com/tunnel")
+
+		if err != nil {
+			response.HandleError(resp, err)
+			return
+		}
+
+		if res.StatusCode() != http.StatusOK {
+			err = errors.New(string(res.Body()))
+			response.HandleError(resp, err)
+			return
+		}
+
+		responseData := res.Result().(*TunnelResponse)
+		if !responseData.Success || responseData.Data == nil || responseData.Data.Token == "" {
+			log.Errorf("get cloudflare tunnel token failed, %v", responseData)
+			err = errors.Errorf("enable https: get cloudflare tunnel token failed")
+			response.HandleError(resp, err)
+			return
+		}
+
+		tuunelApply := NewCloudflareDeploymentApplyConfiguration(responseData.Data.Token)
+
+		createdTunnel, err := k8sClient.AppsV1().Deployments(constants.Namespace).Apply(ctx,
+			&tuunelApply, metav1.ApplyOptions{Force: true, FieldManager: constants.ApplyPatchFieldManager})
+		if err != nil {
+			response.HandleError(resp, errors.Errorf("enable https: apply cloudflared deployment err, %v", err))
+			return
+		}
+
+		o.TunnelEnable = true
+		o.TunnelNamespace = constants.Namespace
+
+		log.Debugf("created cloudflared deployment: %s", utils.PrettyJSON(createdTunnel))
 	}
 
 	log.Info("creating async task to enable https")

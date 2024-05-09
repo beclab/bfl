@@ -43,6 +43,7 @@ const (
 	CheckFrpAgent
 	GenerateCert
 	ConfigureIngressHTTPs
+	CheckTunnel
 )
 
 type TaskResult struct {
@@ -80,10 +81,11 @@ func GetEnableHTTPSTaskState(username string) (*TaskResult, error) {
 }
 
 type EnableHTTPSTaskOption struct {
-	GenerateURL string
-	AccessToken string
-	FrpEnable   bool
-	WaitTimeout *time.Duration
+	GenerateURL  string
+	AccessToken  string
+	FrpEnable    bool
+	TunnelEnable bool
+	WaitTimeout  *time.Duration
 
 	Name      string
 	FrpServer string
@@ -92,6 +94,10 @@ type EnableHTTPSTaskOption struct {
 	FrpDeploymentName     string
 	FrpDeploymentReplicas int32
 
+	TunnelNamespace          string
+	TunnelDeploymentName     string
+	TunnelDeploymentReplicas int32
+
 	L4ProxyNamespace          string
 	L4ProxyDeploymentName     string
 	L4ProxyDeploymentReplicas int32
@@ -99,6 +105,7 @@ type EnableHTTPSTaskOption struct {
 	PublicDomainIP *string
 	PublicCName    *string
 	LocalNodeIP    *string
+	LocalNodePort  *string
 }
 
 type EnableHTTPSTask struct {
@@ -331,6 +338,15 @@ func (t *EnableHTTPSTask) Execute() {
 			t.UpdateTaskState(taskResult)
 			if !t.waitForDeploymentReady(t.o.FrpDeploymentName, t.o.FrpNamespace, t.o.FrpDeploymentReplicas) {
 				err = fmt.Errorf("%q still not ready", t.o.FrpDeploymentName)
+				return
+			}
+		}
+
+		if t.o.TunnelEnable {
+			taskResult.State = CheckTunnel
+			t.UpdateTaskState(taskResult)
+			if !t.waitForDeploymentReady(t.o.TunnelDeploymentName, t.o.TunnelNamespace, t.o.TunnelDeploymentReplicas) {
+				err = fmt.Errorf("%q still not ready", t.o.TunnelDeploymentName)
 				return
 			}
 		}
