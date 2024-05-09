@@ -80,7 +80,13 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, op *ope
 	var userPatches []func(*iamV1alpha2.User)
 	if !isFrp {
 		// only for public ip
-		publicIp := utils.GetMyExternalIPAddr()
+		publicIp := ""
+		if role, ok := user.Annotations[constants.UserAnnotationOwnerRole]; ok && role == constants.RolePlatformAdmin {
+			publicIp = utils.GetMyExternalIPAddr()
+		} else {
+			publicIp = *k8sutil.GetMasterExternalIP(ctx)
+		}
+
 		if publicIp == "" {
 			return errors.New("no public ip found")
 		}
