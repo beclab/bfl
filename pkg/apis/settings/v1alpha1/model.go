@@ -260,6 +260,8 @@ func NewL4ProxyDeploymentApplyConfiguration(namespace, serviceAccountName string
 							ImagePullPolicy: &imagePullPolicy,
 							Command: []string{
 								"/l4-bfl-proxy",
+								"-w",
+								"4",
 							},
 							Env: []applyCorev1.EnvVarApplyConfiguration{
 								{
