@@ -424,7 +424,7 @@ func (h *Handler) handleCreateUser(req *restful.Request, resp *restful.Response)
 		Name:         username,
 		OwnerRole:    userCreate.OwnerRole,
 		DisplayName:  userCreate.DisplayName,
-		Email:        userCreate.Email,
+		Email:        string(terminusName),
 		Password:     userCreate.Password,
 		Description:  userCreate.Description,
 		TerminusName: string(terminusName),
