@@ -60,9 +60,10 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, op *ope
 	)
 
 	publicDomainIp = op.GetUserAnnotation(user, constants.UserAnnotationPublicDomainIp)
-	if publicDomainIp == "" {
-		log.Warnf("user %q no public domain ip", user.Name)
-		return
+	if publicDomainIp != "" {
+		if utils.ListContains(constants.FrpServers, publicDomainIp) {
+			isFrp = true
+		}
 	}
 
 	localDomainIp = op.GetUserAnnotation(user, constants.UserAnnotationLocalDomainIp)
@@ -71,14 +72,10 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, op *ope
 		return
 	}
 
-	if utils.ListContains(constants.FrpServers, publicDomainIp) {
-		isFrp = true
-	}
-
 	cm := certmanager.NewCertManager(terminusName)
 
 	var userPatches []func(*iamV1alpha2.User)
-	if !isFrp {
+	if !isFrp && publicDomainIp != "" {
 		// only for public ip
 		publicIp := ""
 		if role, ok := user.Annotations[constants.UserAnnotationOwnerRole]; ok && role == constants.RolePlatformAdmin {
