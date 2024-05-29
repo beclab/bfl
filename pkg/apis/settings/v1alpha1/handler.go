@@ -208,6 +208,8 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		klog.Errorf("update user err, %v", err)
 	}
 
+	ErrAlreadyEnabled := errors.Errorf("is already enabled")
+	ErrInProgress := errors.Errorf("in progress")
 	err = func() error {
 
 		if user != nil {
@@ -218,7 +220,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 			}
 
 			if userOp.AnnotationExists(user, constants.UserAnnotationZoneKey) {
-				return errors.Errorf("is already enabled")
+				return ErrAlreadyEnabled
 			}
 
 			if v := userOp.GetUserAnnotation(user, constants.EnableSSLTaskResultAnnotationKey); v != "" {
@@ -231,7 +233,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 
 				switch t.State {
 				case settingsTask.Pending, settingsTask.Running:
-					return errors.Errorf("in progress")
+					return ErrInProgress
 				}
 			}
 		}
@@ -239,6 +241,13 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 	}()
 
 	if err != nil {
+		if err == ErrAlreadyEnabled || err == ErrInProgress {
+			klog.Warning("duplicate ssl/enable requets, ", err)
+			err = nil
+			response.SuccessNoData(resp)
+			return
+		}
+
 		response.HandleError(resp, errors.Errorf("enable https: %v", err))
 		return
 	}
@@ -383,10 +392,10 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 			return
 		}
 
-		tuunelApply := NewCloudflareDeploymentApplyConfiguration(responseData.Data.Token)
+		tunnelApply := NewCloudflareDeploymentApplyConfiguration(responseData.Data.Token)
 
 		createdTunnel, err := k8sClient.AppsV1().Deployments(constants.Namespace).Apply(ctx,
-			&tuunelApply, metav1.ApplyOptions{Force: true, FieldManager: constants.ApplyPatchFieldManager})
+			&tunnelApply, metav1.ApplyOptions{Force: true, FieldManager: constants.ApplyPatchFieldManager})
 		if err != nil {
 			response.HandleError(resp, errors.Errorf("enable https: apply cloudflared deployment err, %v", err))
 			return
