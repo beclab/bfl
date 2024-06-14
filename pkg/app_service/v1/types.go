@@ -20,6 +20,7 @@ type AppInfo struct {
 	State           string     `json:"state"`
 	IsSysApp        bool       `json:"isSysApp"`
 	IsClusterScoped bool       `json:"isClusterScoped"`
+	MobileSupported bool       `json:"mobileSupported"`
 }
 
 type Entrance struct {
