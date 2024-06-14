@@ -54,7 +54,7 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 
 		// get app settings to filter system service not to list
 		title, target, state := "", "", ""
-		isClusterScoped := false
+		isClusterScoped, mobileSupported := false, false
 		settings, ok := appSpec["settings"]
 		if ok {
 			settingsMap := settings.(map[string]interface{})
@@ -73,6 +73,9 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 
 			if t, ok := settingsMap["target"]; ok {
 				target = t.(string)
+			}
+			if t, ok := settingsMap["mobileSupported"]; ok && t == "true" {
+				mobileSupported = true
 			}
 		}
 
@@ -128,6 +131,7 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 			State:           state,
 			IsSysApp:        isSysApp,
 			IsClusterScoped: isClusterScoped,
+			MobileSupported: mobileSupported,
 		})
 
 	}
