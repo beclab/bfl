@@ -22,7 +22,7 @@ RUN cd bytetrade.io/web3os/bfl-ingress && \
 COPY . bytetrade.io/web3os/bfl-ingress/
 
 RUN cd bytetrade.io/web3os/bfl-ingress/ && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -a -o bfl-ingress cmd/ingress/main.go
+    CGO_ENABLED=0 go build -ldflags="-s -w" -a -o bfl-ingress cmd/ingress/main.go
 
 FROM bytetrade/nginx:1.20.1
 WORKDIR /

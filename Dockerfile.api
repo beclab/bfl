@@ -22,7 +22,7 @@ COPY pkg/ bytetrade.io/web3os/bfl/pkg/
 COPY internal/ bytetrade.io/web3os/bfl/internal/
 
 RUN cd bytetrade.io/web3os/bfl/ && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -a -o bfl-api cmd/apiserver/main.go
+    CGO_ENABLED=0 go build -ldflags="-s -w" -a -o bfl-api cmd/apiserver/main.go
 
 
 # Use distroless as minimal base image to package the manager binary
