@@ -3,8 +3,10 @@ package nginx
 import (
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 
-	"github.com/mitchellh/go-ps"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -76,12 +78,28 @@ func (n *NginxCommand) VersionAndOption() ([]byte, error) {
 }
 
 func IsRunning() bool {
-	processes, _ := ps.Processes()
-	for _, p := range processes {
-		if p.Executable() == "nginx" {
+	// processes, _ := ps.Processes()
+	// for _, p := range processes {
+	// 	if p.Executable() == "nginx" {
+	// 		return true
+	// 	}
+	// }
+
+	// return false
+	out, err := os.ReadFile("/var/run/nginx.pid")
+	if err != nil {
+		klog.V(2).ErrorS(err, "read /var/run/nginx.pid")
+		return false
+	}
+
+	pid := string(out)
+	if pid != "" {
+		pid = strings.TrimSpace(pid)
+		_, err = strconv.ParseUint(pid, 10, 32)
+		if err == nil {
 			return true
 		}
 	}
-
 	return false
+
 }

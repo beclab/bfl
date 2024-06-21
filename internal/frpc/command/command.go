@@ -191,6 +191,7 @@ func (f *FrpcCommand) GetTemplate() string {
 }
 
 func IsRunning() bool {
+	// FIXME: not work in arm64
 	processes, _ := ps.Processes()
 	for _, p := range processes {
 		if p.Executable() == "frpc" {
