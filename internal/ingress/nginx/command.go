@@ -86,9 +86,9 @@ func IsRunning() bool {
 	// }
 
 	// return false
-	out, err := os.ReadFile("/var/run/nginx.pid")
+	out, err := os.ReadFile(PID)
 	if err != nil {
-		klog.V(2).ErrorS(err, "read /var/run/nginx.pid")
+		klog.V(2).ErrorS(err, "read ", PID)
 		return false
 	}
 
