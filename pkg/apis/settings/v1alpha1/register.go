@@ -16,6 +16,9 @@ const (
 	ParamServiceName  = "service"
 	ParamAppName      = "app"
 	ParamEntranceName = "entrance_name"
+	ParamDataType     = "dataType"
+	ParamGroup        = "group"
+	ParamVersion      = "version"
 )
 
 var ModuleVersion = runtime.ModuleVersion{Name: "settings", Version: "v1alpha1"}
@@ -244,6 +247,31 @@ func AddContainer(c *restful.Container) error {
 		Param(ws.PathParameter(ParamAppName, "app name").DataType("string").Required(true)).
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{Data: app_service.Entrances{}}))
+
+	ws.Route(ws.GET("/apps/permissions").
+		To(handler.applicationPermissionList).
+		Doc("Get application permission list").
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", nil))
+
+	ws.Route(ws.GET("/apps/permissions/{"+ParamAppName+"}").
+		To(handler.applicationPermission).
+		Doc("Get application permission list").
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Param(ws.PathParameter(ParamAppName, "app name").DataType("string").Required(true)).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", nil))
+
+	ws.Route(ws.GET("/apps/provider-registry/{"+ParamDataType+"}/{"+ParamGroup+"}/{"+ParamVersion+"}").
+		To(handler.getProviderRegistry).
+		Doc("Get an provider registry").
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Param(ws.PathParameter(ParamDataType, "dataType").DataType("string").Required(true)).
+		Param(ws.PathParameter(ParamGroup, "group").DataType("string").Required(true)).
+		Param(ws.PathParameter(ParamVersion, "version").DataType("string").Required(true)).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", nil))
 
 	// system upgrade
 	ws.Route(ws.GET("/upgrade/newversion").
