@@ -39,6 +39,9 @@ const (
 	AppServiceUpgradeCancelURLTempl        = "http://%s:%s/app-service/v1/upgrade/cancel"
 	AppServiceUserMetricsURLTempl          = "http://%s:%s/app-service/v1/users/%s/metrics"
 	AppServiceAppInstallationRunningList   = "http://%s:%s/app-service/v1/apps/pending-installing/task"
+	AppServiceAppPermissionListTempl       = "http://%s:%s/app-service/v1/perms"
+	AppServiceAppPermissionTempl           = "http://%s:%s/app-service/v1/perms/%s"
+	AppserviceProvideRegistryTempl         = "http://%s:%s/app-service/v1/perms/provider-registry/%s/%s/%s"
 
 	AppServiceAppSuspendURLTempl = "http://%s:%s/app-service/v1/apps/%s/suspend"
 	AppServiceAppResumeURLTempl  = "http://%s:%s/app-service/v1/apps/%s/resume"
@@ -337,4 +340,25 @@ func (c *Client) ResumeApp(appName, token string) (map[string]interface{}, error
 	urlStr := fmt.Sprintf(AppServiceAppResumeURLTempl, appServiceHost, appServicePort, appName)
 
 	return c.doHttpPost(urlStr, token, nil)
+}
+
+func (c *Client) GetApplicationPermissionList(token string) ([]map[string]interface{}, error) {
+	appServiceHost := os.Getenv(AppServiceHostEnv)
+	appServicePort := os.Getenv(AppServicePortEnv)
+	urlStr := fmt.Sprintf(AppServiceAppPermissionListTempl, appServiceHost, appServicePort)
+	return c.doHttpGetList(urlStr, token)
+}
+
+func (c *Client) GetApplicationPermission(token, app string) (map[string]interface{}, error) {
+	appServiceHost := os.Getenv(AppServiceHostEnv)
+	appServicePort := os.Getenv(AppServicePortEnv)
+	urlStr := fmt.Sprintf(AppServiceAppPermissionTempl, appServiceHost, appServicePort, app)
+	return c.doHttpGetOne(urlStr, token)
+}
+
+func (c *Client) GetProviderRegistry(token, dataType, group, version string) (map[string]interface{}, error) {
+	appServiceHost := os.Getenv(AppServiceHostEnv)
+	appServicePort := os.Getenv(AppServicePortEnv)
+	urlStr := fmt.Sprintf(AppserviceProvideRegistryTempl, appServiceHost, appServicePort, dataType, group, version)
+	return c.doHttpGetOne(urlStr, token)
 }

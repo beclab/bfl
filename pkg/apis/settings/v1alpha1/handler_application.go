@@ -512,3 +512,51 @@ func (h *Handler) setCustomDomainCnameStatus(sslStatus, hostnameStatus string) s
 		return constants.CustomDomainCnameStatusPending
 	}
 }
+
+func (h *Handler) applicationPermissionList(req *restful.Request, resp *restful.Response) {
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+
+	appServiceClient := app_service.NewAppServiceClient()
+
+	aps, err := appServiceClient.GetApplicationPermissionList(token)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	response.Success(resp, api.NewListResult(aps))
+}
+
+func (h *Handler) applicationPermission(req *restful.Request, resp *restful.Response) {
+	appName := req.PathParameter(ParamAppName)
+
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+
+	appServiceClient := app_service.NewAppServiceClient()
+
+	ap, err := appServiceClient.GetApplicationPermission(token, appName)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	response.Success(resp, ap)
+}
+
+func (h *Handler) getProviderRegistry(req *restful.Request, resp *restful.Response) {
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+
+	dataType := req.PathParameter(ParamDataType)
+	group := req.PathParameter(ParamGroup)
+	version := req.PathParameter(ParamVersion)
+
+	appServiceClient := app_service.NewAppServiceClient()
+
+	pr, err := appServiceClient.GetProviderRegistry(token, dataType, group, version)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	response.Success(resp, pr)
+}
