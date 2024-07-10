@@ -196,6 +196,8 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string) []conf
 				}
 			}
 
+			_, enableOIDC := app.Spec.Settings["oidc.client.id"]
+
 			s := config.Server{
 				Hostname:   appHostname,
 				Aliases:    formatDomain(appLocalName, customPrefixDomainName),
@@ -209,6 +211,7 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string) []conf
 				},
 				EnableAnalytics: enableAnalytics,
 				AnalyticsScript: analyticsScript,
+				EnableOIDC:      enableOIDC,
 			}
 			servers = append(servers, s)
 		}
