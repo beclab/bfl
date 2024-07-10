@@ -6,6 +6,7 @@
 {{ $statusPath := .StatusPath }}
 {{ $realIpFrom := .RealIpFrom }}
 {{ $userName := .UserName }}
+{{ $userZone := .UserZone }}
 
 # Configuration checksum: {{ $cfg.Checksum }}
 
@@ -275,6 +276,10 @@ http {
             {{ if and $server.EnableAnalytics (not (eq $server.AnalyticsScript "")) }}
             sub_filter '</body>' "{{ $server.AnalyticsScript }}\n</body>";
             sub_filter_once off;
+            {{ end }}
+
+            {{ if $server.EnableOIDC }}
+            add_header Set-Cookie "prev-host=$http_host;Domain=.{{ $userZone }};Path=/;";
             {{ end }}
         }
         {{ end }}
