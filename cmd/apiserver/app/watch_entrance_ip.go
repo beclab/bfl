@@ -56,10 +56,10 @@ func watch(ctx context.Context) (err error) {
 	}
 
 	// reconcile dns record
-	return reconcile(ctx, constants.TerminusName(terminusName), op, user)
+	return reconcile(ctx, constants.TerminusName(terminusName), zone, op, user)
 }
 
-func reconcile(ctx context.Context, terminusName constants.TerminusName, op *operator.UserOperator, user *iamV1alpha2.User) (err error) {
+func reconcile(ctx context.Context, terminusName constants.TerminusName, zone string, op *operator.UserOperator, user *iamV1alpha2.User) (err error) {
 	var (
 		isFrp                                       bool
 		isCloudFlareTunnel                          bool
@@ -115,7 +115,7 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, op *ope
 	}
 
 	// nat gateway ip
-	if natGatewayIp != "" && !isCurrentLocalDomainName(string(terminusName), natGatewayIp) {
+	if natGatewayIp != "" && !isCurrentLocalDomainName(zone, natGatewayIp) {
 		err := cm.AddDNSRecord(nil, &natGatewayIp, nil)
 		if err != nil {
 			return errors.WithStack(err)
