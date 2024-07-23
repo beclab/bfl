@@ -163,6 +163,8 @@ var (
 
 	UserAnnotationLocalDomainIp = fmt.Sprintf("%s/local-domain-ip", AnnotationGroup)
 
+	UserAnnotationNatGatewayIp = fmt.Sprintf("%s/nat-gateway-ip", AnnotationGroup)
+
 	FrpDeploymentName = "frp-agent"
 
 	FrpServers = []string{

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -60,9 +61,9 @@ func watch(ctx context.Context) (err error) {
 
 func reconcile(ctx context.Context, terminusName constants.TerminusName, op *operator.UserOperator, user *iamV1alpha2.User) (err error) {
 	var (
-		isFrp                         bool
-		isCloudFlareTunnel            bool
-		publicDomainIp, localDomainIp string
+		isFrp                                       bool
+		isCloudFlareTunnel                          bool
+		publicDomainIp, localDomainIp, natGatewayIp string
 	)
 
 	publicDomainIp = op.GetUserAnnotation(user, constants.UserAnnotationPublicDomainIp)
@@ -80,6 +81,8 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, op *ope
 		log.Warnf("user %q no local domain ip", user.Name)
 		return
 	}
+
+	natGatewayIp = op.GetUserAnnotation(user, constants.UserAnnotationNatGatewayIp)
 
 	cm := certmanager.NewCertManager(terminusName)
 
@@ -121,9 +124,12 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, op *ope
 		log.Debugf("original local node ip: %s", localDomainIp)
 
 		// resolve local domain
-		err := cm.AddDNSRecord(nil, newLocalIp, nil)
-		if err != nil {
-			return errors.WithStack(err)
+		if natGatewayIp == "" || // non-nat mode
+			(natGatewayIp != "" && !isCurrentLocalDomainName(string(terminusName), natGatewayIp)) {
+			err := cm.AddDNSRecord(nil, newLocalIp, nil)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 		userPatches = append(userPatches, func(u *iamV1alpha2.User) {
 			u.Annotations[constants.UserAnnotationLocalDomainIp] = *newLocalIp
@@ -177,4 +183,22 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, op *ope
 	}
 
 	return
+}
+
+func isCurrentLocalDomainName(terminusName, ip string) bool {
+	domain := "local." + terminusName
+
+	ips, err := net.LookupIP(domain)
+	if err != nil {
+		log.Errorf("lookup domain failed, %v, %v", err, domain)
+		return true
+	}
+
+	for _, i := range ips {
+		if i == ip {
+			return true
+		}
+	}
+
+	return false
 }
