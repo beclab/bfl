@@ -114,6 +114,14 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, op *ope
 		log.Infof("resolved new public ip: %v", publicIp)
 	}
 
+	// nat gateway ip
+	if natGatewayIp != "" && !isCurrentLocalDomainName(string(terminusName), natGatewayIp) {
+		err := cm.AddDNSRecord(nil, &natGatewayIp, nil)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
 	// local ip
 	newLocalIp, err := k8sutil.GetL4ProxyNodeIP(ctx, 5*time.Minute)
 	if err != nil {
@@ -124,8 +132,8 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, op *ope
 		log.Debugf("original local node ip: %s", localDomainIp)
 
 		// resolve local domain
-		if natGatewayIp == "" || // non-nat mode
-			(natGatewayIp != "" && !isCurrentLocalDomainName(string(terminusName), natGatewayIp)) {
+		if natGatewayIp == "" {
+			// non-nat mode
 			err := cm.AddDNSRecord(nil, newLocalIp, nil)
 			if err != nil {
 				return errors.WithStack(err)
