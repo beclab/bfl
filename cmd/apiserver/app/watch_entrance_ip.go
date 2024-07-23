@@ -195,7 +195,7 @@ func isCurrentLocalDomainName(terminusName, ip string) bool {
 	}
 
 	for _, i := range ips {
-		if i == ip {
+		if i.To4().String() == ip {
 			return true
 		}
 	}
