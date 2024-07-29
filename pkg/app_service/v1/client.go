@@ -40,6 +40,7 @@ const (
 	AppServiceUserMetricsURLTempl          = "http://%s:%s/app-service/v1/users/%s/metrics"
 	AppServiceAppInstallationRunningList   = "http://%s:%s/app-service/v1/apps/pending-installing/task"
 	AppServiceAppPermissionListTempl       = "http://%s:%s/app-service/v1/perms"
+	AppServiceAppProviderRegistryListTempl = "http://%s:%s/app-service/v1/apps/provider-registry/%s"
 	AppServiceAppPermissionTempl           = "http://%s:%s/app-service/v1/perms/%s"
 	AppserviceProvideRegistryTempl         = "http://%s:%s/app-service/v1/perms/provider-registry/%s/%s/%s"
 
@@ -346,6 +347,13 @@ func (c *Client) GetApplicationPermissionList(token string) ([]map[string]interf
 	appServiceHost := os.Getenv(AppServiceHostEnv)
 	appServicePort := os.Getenv(AppServicePortEnv)
 	urlStr := fmt.Sprintf(AppServiceAppPermissionListTempl, appServiceHost, appServicePort)
+	return c.doHttpGetList(urlStr, token)
+}
+
+func (c *Client) GetApplicationProviderList(appName, token string) ([]map[string]interface{}, error) {
+	appServiceHost := os.Getenv(AppServiceHostEnv)
+	appServicePort := os.Getenv(AppServicePortEnv)
+	urlStr := fmt.Sprintf(AppServiceAppProviderRegistryListTempl, appServiceHost, appServicePort, appName)
 	return c.doHttpGetList(urlStr, token)
 }
 

@@ -263,6 +263,13 @@ func AddContainer(c *restful.Container) error {
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", nil))
 
+	ws.Route(ws.GET("/apps/provider-registry/{"+ParamAppName+"}").
+		To(handler.getApplicationProviderList).
+		Doc("Get application provider-registry list").
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", nil))
+
 	ws.Route(ws.GET("/apps/provider-registry/{"+ParamDataType+"}/{"+ParamGroup+"}/{"+ParamVersion+"}").
 		To(handler.getProviderRegistry).
 		Doc("Get an provider registry").
