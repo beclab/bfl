@@ -187,7 +187,7 @@ func parseFrpConfig(terminusName constants.TerminusName, frpServer string) (stri
 }
 
 func NewL4ProxyDeploymentApplyConfiguration(namespace, serviceAccountName string, port int) applyAppsv1.DeploymentApplyConfiguration {
-	imagePullPolicy := corev1.PullAlways
+	imagePullPolicy := corev1.PullIfNotPresent //corev1.PullAlways
 	strategyRecreate := appsv1.RecreateDeploymentStrategyType
 	dnsPolicy := corev1.DNSClusterFirstWithHostNet
 	protocolTCP := corev1.ProtocolTCP
