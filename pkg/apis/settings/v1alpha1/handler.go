@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -363,7 +364,8 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 			Service: fmt.Sprintf("https://%s:%s", *o.LocalNodeIP, *o.LocalNodePort),
 		}
 
-		res, err := h.httpClient.R().
+		res, err := h.httpClient.
+			SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true}).R().
 			SetHeaders(map[string]string{
 				restful.HEADER_ContentType: restful.MIME_JSON,
 				restful.HEADER_Accept:      restful.MIME_JSON,

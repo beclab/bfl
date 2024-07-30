@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
 	"net"
@@ -90,6 +91,7 @@ func GetMyExternalIPAddr() string {
 
 	for site := range sites {
 		go func(name string) {
+			http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 			c := http.Client{Timeout: 5 * time.Second}
 			resp, err := c.Get(sites[name])
 			if err != nil {

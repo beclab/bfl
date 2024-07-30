@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -157,7 +158,8 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 				Service: fmt.Sprintf("https://%s:%s", *newLocalIp, "443"),
 			}
 
-			res, err := resty.New().SetTimeout(30 * time.Second).R().
+			res, err := resty.New().SetTimeout(30 * time.Second).
+				SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true}).R().
 				SetHeaders(map[string]string{
 					restful.HEADER_ContentType: restful.MIME_JSON,
 					restful.HEADER_Accept:      restful.MIME_JSON,
