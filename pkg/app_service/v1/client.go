@@ -41,8 +41,10 @@ const (
 	AppServiceAppInstallationRunningList   = "http://%s:%s/app-service/v1/apps/pending-installing/task"
 	AppServiceAppPermissionListTempl       = "http://%s:%s/app-service/v1/perms"
 	AppServiceAppProviderRegistryListTempl = "http://%s:%s/app-service/v1/apps/provider-registry/%s"
-	AppServiceAppPermissionTempl           = "http://%s:%s/app-service/v1/perms/%s"
-	AppserviceProvideRegistryTempl         = "http://%s:%s/app-service/v1/perms/provider-registry/%s/%s/%s"
+	AppServiceAppSubjectListTempl          = "http://%s:%s/app-service/v1/apps/%s/subject"
+
+	AppServiceAppPermissionTempl   = "http://%s:%s/app-service/v1/perms/%s"
+	AppserviceProvideRegistryTempl = "http://%s:%s/app-service/v1/perms/provider-registry/%s/%s/%s"
 
 	AppServiceAppSuspendURLTempl = "http://%s:%s/app-service/v1/apps/%s/suspend"
 	AppServiceAppResumeURLTempl  = "http://%s:%s/app-service/v1/apps/%s/resume"
@@ -369,4 +371,11 @@ func (c *Client) GetProviderRegistry(token, dataType, group, version string) (ma
 	appServicePort := os.Getenv(AppServicePortEnv)
 	urlStr := fmt.Sprintf(AppserviceProvideRegistryTempl, appServiceHost, appServicePort, dataType, group, version)
 	return c.doHttpGetOne(urlStr, token)
+}
+
+func (c *Client) GetApplicationSubjectList(appName, token string) ([]map[string]interface{}, error) {
+	appServiceHost := os.Getenv(AppServiceHostEnv)
+	appServicePort := os.Getenv(AppServicePortEnv)
+	urlStr := fmt.Sprintf(AppServiceAppSubjectListTempl, appServiceHost, appServicePort, appName)
+	return c.doHttpGetList(urlStr, token)
 }
