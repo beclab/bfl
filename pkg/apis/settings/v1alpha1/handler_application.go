@@ -542,6 +542,21 @@ func (h *Handler) getApplicationProviderList(req *restful.Request, resp *restful
 	response.Success(resp, api.NewListResult(aps))
 }
 
+func (h *Handler) getApplicationSubjectList(req *restful.Request, resp *restful.Response) {
+	// fetch token from request
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	appName := req.PathParameter(ParamAppName)
+
+	appServiceClient := app_service.NewAppServiceClient()
+
+	aps, err := appServiceClient.GetApplicationSubjectList(appName, token)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	response.Success(resp, api.NewListResult(aps))
+}
+
 func (h *Handler) applicationPermission(req *restful.Request, resp *restful.Response) {
 	appName := req.PathParameter(ParamAppName)
 
