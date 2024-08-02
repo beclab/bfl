@@ -15,6 +15,7 @@ type Client struct {
 const (
 	AppServiceGetURLTempl                  = "http://%s:%s/app-service/v1/apps/%s"
 	AppServiceListURLTempl                 = "http://%s:%s/app-service/v1/apps"
+	AppServiceAllListURLTempl              = "http://%s:%s/app-service/v1/all/apps"
 	AppServiceUserAppListURLTempl          = "http://%s:%s/app-service/v1/user-apps/%s"
 	AppServiceRegistryListURLTempl         = "http://%s:%s/app-service/v1/registry/applications"
 	AppServiceAppDetailURLTempl            = "http://%s:%s/app-service/v1/registry/applications/%s"
@@ -378,4 +379,21 @@ func (c *Client) GetApplicationSubjectList(appName, token string) ([]map[string]
 	appServicePort := os.Getenv(AppServicePortEnv)
 	urlStr := fmt.Sprintf(AppServiceAppSubjectListTempl, appServiceHost, appServicePort, appName)
 	return c.doHttpGetList(urlStr, token)
+}
+
+func (c *Client) FetchAllAppList(token string) ([]map[string]interface{}, error) {
+	appServiceHost := os.Getenv(AppServiceHostEnv)
+	appServicePort := os.Getenv(AppServicePortEnv)
+	urlStr := fmt.Sprintf(AppServiceAllListURLTempl, appServiceHost, appServicePort)
+
+	return c.doHttpGetList(urlStr, token)
+}
+
+func (c *Client) ListAllAppInfosByAdmin(token string) ([]*AppInfo, error) {
+	app, err := c.FetchAllAppList(token)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.getAppListFromData(app)
 }
