@@ -62,3 +62,19 @@ func (h *Handler) handleListApps(req *restful.Request, resp *restful.Response) {
 	}
 	response.Success(resp, api.NewListResult(list))
 }
+
+func (h *Handler) handleListAllApps(req *restful.Request, resp *restful.Response) {
+	list, err := h.Base.GetAppListAndServicePort(req, h.appService,
+		func() (string, []*app_service.AppInfo, error) { return h.Base.GetAllAppViaToken(req, h.appService) })
+	if err != nil {
+		response.HandleInternalError(resp, fmt.Errorf("list apps: %v", err))
+		return
+	}
+	userAppMap := make(map[string][]*app_service.AppInfo)
+	for _, u := range list {
+		userAppMap[u.Owner] = append(userAppMap[u.Owner], u)
+	}
+
+	//response.Success(resp, api.NewListResult(list))
+	response.Success(resp, userAppMap)
+}

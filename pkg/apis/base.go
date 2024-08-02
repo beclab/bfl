@@ -77,3 +77,12 @@ func (h *Base) GetAppListAndServicePort(req *restful.Request, appService *app_se
 
 	return apps, nil
 }
+
+func (b *Base) GetAllAppViaToken(req *restful.Request, appService *app_service.Client) (string, []*app_service.AppInfo, error) {
+	user := req.Attribute(constants.UserContextAttribute).(string)
+	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	apps, err := appService.ListAllAppInfosByAdmin(token)
+
+	return user, apps, err
+
+}
