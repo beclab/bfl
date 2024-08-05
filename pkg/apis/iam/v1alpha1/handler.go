@@ -544,9 +544,9 @@ func (h *Handler) handleCreateUser(req *restful.Request, resp *restful.Response)
 				select {
 				case <-ticker.C:
 					// get delete user's sys app status
-					res, err := appServiceClient.UserAppsStatus(userCreate.Name, token)
+					res, err := appServiceClient.UserAppsStatus(username, token)
 					if err != nil {
-						log.Errorf("create user: get user(%s)'s sys apps creating, %v", userCreate.Name, err)
+						log.Errorf("create user: get user(%s)'s sys apps creating, %v", username, err)
 						h.userCreatingCount.Add(-1)
 						return
 					}
@@ -559,19 +559,19 @@ func (h *Handler) handleCreateUser(req *restful.Request, resp *restful.Response)
 
 					if status == "Failed" {
 						errStr := resData["error"].(string)
-						log.Errorf("create user: %q, error: %s", userCreate.Name, errStr)
+						log.Errorf("create user: %q, error: %s", username, errStr)
 						revokeCreates(taskCtx)
 						return
 					}
 
 					if status == "Created" {
-						log.Infof("create user: %q success", userCreate.Name)
+						log.Infof("create user: %q success", username)
 						h.userCreatingCount.Add(-1)
 						return
 					}
 
 				case <-timeout.C:
-					log.Errorf("create user: %q timeout", userCreate.Name)
+					log.Errorf("create user: %q timeout", username)
 					h.userCreatingCount.Add(-1)
 					return
 				} // end select
@@ -580,7 +580,7 @@ func (h *Handler) handleCreateUser(req *restful.Request, resp *restful.Response)
 		}, // end func define
 	}
 
-	task.LocalTaskQueue.Push("create-user-"+userCreate.Name, createUserTask)
+	task.LocalTaskQueue.Push("create-user-"+username, createUserTask)
 
 	response.SuccessNoData(resp)
 }
