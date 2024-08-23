@@ -102,6 +102,13 @@ func AddContainer(c *restful.Container) error {
 		Reads(PostLocale{}).
 		Returns(http.StatusOK, "", response.Response{}))
 
+	ws.Route(ws.GET("/config-system").
+		To(handler.handleGetSysConfig).
+		Doc("get user locale.").
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", response.Response{}))
+
 	ws.Route(ws.POST("/set-login-background").
 		To(handler.handlerUpdateUserLoginBackground).
 		Doc("Update user login background.").

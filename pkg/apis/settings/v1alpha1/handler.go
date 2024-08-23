@@ -692,6 +692,11 @@ func (h *Handler) handleUpdateLocale(req *restful.Request, resp *restful.Respons
 					u.Annotations[constants.UserLocation] = locale.Location
 				}
 
+				if locale.Theme == "" {
+					locale.Theme = "white"
+				}
+				u.Annotations[constants.UserTheme] = locale.Theme
+
 				u.Annotations[constants.UserTerminusWizardStatus] = string(constants.WaitActivateNetwork)
 			},
 		}); err != nil {
@@ -784,4 +789,23 @@ func (h *Handler) handlerUpdateUserAvatar(req *restful.Request, resp *restful.Re
 	}
 
 	response.SuccessNoData(resp)
+}
+
+func (h *Handler) handleGetSysConfig(req *restful.Request, resp *restful.Response) {
+	userOp, err := operator.NewUserOperator()
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("update user avatar err: new user operator err, %v", err))
+		return
+	}
+	user, err := userOp.GetUser(constants.Username)
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("get user sys config err: get user err, %v", err))
+		return
+	}
+	cfg := PostLocale{
+		Language: user.Annotations[constants.UserLanguage],
+		Location: user.Annotations[constants.UserLocation],
+		Theme:    user.Annotations[constants.UserTheme],
+	}
+	response.Success(resp, &cfg)
 }
