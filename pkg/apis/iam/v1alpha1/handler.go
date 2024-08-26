@@ -29,6 +29,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 	"golang.org/x/crypto/bcrypt"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +45,9 @@ const (
 	kubeSphereAPIToken = "/oauth/token"
 
 	kubeSphereAPILogout = "/oauth/logout"
+
+	minPodNumPerUser      = 25
+	reservedPodNumForUser = 10
 )
 
 var defaultGlobalRoles = []string{
@@ -309,9 +313,17 @@ func (h *Handler) handleCreateUser(req *restful.Request, resp *restful.Response)
 	if !h.tryUserCreating(resp) {
 		return
 	}
-
+	isSatisfied, err := h.checkClusterPodCapacity(req)
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("user create: %v", err))
+		return
+	}
+	if !isSatisfied {
+		response.HandleBadRequest(resp, errors.Errorf("Unable to create user: Insufficient pods can allocate in the cluster."))
+		return
+	}
 	var userCreate UserCreate
-	err := req.ReadEntity(&userCreate)
+	err = req.ReadEntity(&userCreate)
 	if err != nil {
 		response.HandleBadRequest(resp, errors.Errorf("user create: %v", err))
 		return
@@ -407,13 +419,13 @@ func (h *Handler) handleCreateUser(req *restful.Request, resp *restful.Response)
 		return
 	}
 	// cluster's free memory size must greater than user's memory-limit size
-	if memory.CmpInt64(int64(metrics.Memory.Total-metrics.Memory.Usage)) > 0 {
-		response.HandleBadRequest(resp, errors.Errorf("user's memory size requirement can't be fulfilled,required is: %.0f bytes, but available is: %.0f bytes", memoryLimit, metrics.Memory.Total-metrics.Memory.Usage))
+	if memory.CmpInt64(int64(metrics.Memory.Total-metrics.Memory.Usage)) >= 0 {
+		response.HandleBadRequest(resp, errors.Errorf("Unable to create user: Insufficient memory available in the cluster to meet the quota, required is: %.0f bytes, but available is: %.0f bytes", memoryLimit, metrics.Memory.Total-metrics.Memory.Usage))
 		return
 	}
 	// cluster's free cpu core  must greater than user's cpu-limit core
-	if cpu.CmpInt64(int64(metrics.CPU.Total-metrics.CPU.Usage)) > 0 {
-		response.HandleBadRequest(resp, errors.Errorf("user's CPU requirement can't be fulfilled, required is: %.1f, but available is: %.0f", cpuLimit, metrics.CPU.Total-metrics.CPU.Usage))
+	if cpu.CmpInt64(int64(metrics.CPU.Total-metrics.CPU.Usage)) >= 0 {
+		response.HandleBadRequest(resp, errors.Errorf("Unable to create user: Insufficient memory available in the cluster to meet the quota, required is: %.1f, but available is: %.1f", cpuLimit, metrics.CPU.Total-metrics.CPU.Usage))
 		return
 	}
 
@@ -1132,4 +1144,52 @@ func (h *Handler) handleValidateUserPassword(req *restful.Request, resp *restful
 	}
 
 	response.SuccessNoData(resp)
+}
+
+func (h *Handler) checkClusterPodCapacity(req *restful.Request) (bool, error) {
+	kClient := runtime.NewKubeClient(req)
+	nodes, err := kClient.Kubernetes().CoreV1().Nodes().List(req.Request.Context(), metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	var currentPodNum, maxPodNum int64
+	nodeMap := sets.String{}
+	for _, node := range nodes.Items {
+		if !IsNodeReady(&node) || node.Spec.Unschedulable {
+			continue
+		}
+		pods, _ := node.Status.Capacity.Pods().AsInt64()
+		maxPodNum += pods
+		nodeMap.Insert(node.Name)
+	}
+
+	pods, err := kClient.Kubernetes().CoreV1().Pods(corev1.NamespaceAll).List(req.Request.Context(), metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for _, pod := range pods.Items {
+		if IsPodActive(&pod) && (nodeMap.Has(pod.Spec.NodeName) || pod.Status.Phase == corev1.PodPending) {
+			currentPodNum++
+		}
+	}
+	klog.Infof("currentPodNum :%v", currentPodNum)
+	if currentPodNum+minPodNumPerUser > maxPodNum-reservedPodNumForUser {
+		return false, nil
+	}
+	return true, nil
+}
+
+func IsPodActive(p *corev1.Pod) bool {
+	return corev1.PodSucceeded != p.Status.Phase &&
+		corev1.PodFailed != p.Status.Phase &&
+		p.DeletionTimestamp == nil
+}
+
+func IsNodeReady(node *corev1.Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == corev1.NodeReady {
+			return c.Status == corev1.ConditionTrue
+		}
+	}
+	return false
 }
