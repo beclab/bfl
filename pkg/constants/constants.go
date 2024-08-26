@@ -150,6 +150,7 @@ var (
 	UserLanguage = fmt.Sprintf("%s/language", AnnotationGroup)
 
 	UserLocation = fmt.Sprintf("%s/location", AnnotationGroup)
+	UserTheme    = fmt.Sprintf("%s/theme", AnnotationGroup)
 
 	UserTerminusWizardStatus = fmt.Sprintf("%s/wizard-status", AnnotationGroup)
 

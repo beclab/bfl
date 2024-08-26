@@ -144,6 +144,7 @@ type PublicDomainAccessPolicy struct {
 type PostLocale struct {
 	Language string `json:"language"`
 	Location string `json:"location"`
+	Theme    string `json:"theme"`
 }
 
 type TunnelRequest struct {
