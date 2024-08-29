@@ -514,7 +514,8 @@ type Server struct {
 	EnableAnalytics bool   `json:"enableAnalytics"`
 	AnalyticsScript string `json:"analyticsScript"`
 
-	EnableOIDC bool `json:"enableOIDC"`
+	EnableOIDC            bool `json:"enableOIDC"`
+	EnableWindowPushState bool `json:"enableWindowPushState"`
 }
 
 type CustomServer struct {
