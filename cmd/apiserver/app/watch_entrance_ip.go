@@ -128,7 +128,9 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 		return err
 	}
 
-	if newLocalIp != nil && localDomainIp != *newLocalIp {
+	if newLocalIp != nil &&
+		*newLocalIp != "127.0.0.1" && *newLocalIp != "127.0.1.1" &&
+		localDomainIp != *newLocalIp {
 		log.Debugf("original local node ip: %s", localDomainIp)
 
 		// resolve local domain
