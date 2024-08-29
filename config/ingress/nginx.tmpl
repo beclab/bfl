@@ -8,6 +8,26 @@
 {{ $userName := .UserName }}
 {{ $userZone := .UserZone }}
 
+{{ $windowPushStateScript := `<script>
+                                (function () {
+                                  if (window.top == window) {
+                                      return;
+                                  }
+                                  const originalPushState = history.pushState;
+                                  const pushStateEvent = new Event("pushstate");
+                                  history.pushState = function (...args) {
+                                    originalPushState.apply(this, args);
+                                    window.dispatchEvent(pushStateEvent);
+                                  };
+                                  window.addEventListener("pushstate", () => {
+                                    window.parent.postMessage(
+                                      {type: "locationHref", message: location.href},
+                                      "*"
+                                    );
+                                  });
+                                })();
+                              </script>` }}
+
 # Configuration checksum: {{ $cfg.Checksum }}
 
 pid {{ .PID }};
@@ -273,8 +293,16 @@ http {
             resolver coredns.kube-system.svc.cluster.local;
             set $h {{ $location.ProxyPass }};
             proxy_pass $h;
+
+            {{ if $server.EnableWindowPushState }}
+            sub_filter '</html>' '{{ $windowPushStateScript }}\n</html>';
+            {{ end }}
+
             {{ if and $server.EnableAnalytics (not (eq $server.AnalyticsScript "")) }}
             sub_filter '</body>' "{{ $server.AnalyticsScript }}\n</body>";
+            {{ end }}
+
+            {{ if or $server.EnableWindowPushState (and $server.EnableAnalytics (not (eq $server.AnalyticsScript ""))) }}
             sub_filter_once off;
             {{ end }}
 
@@ -376,8 +404,14 @@ http {
         {{ range $location := $server.Locations }}
         location {{ $location.Prefix }} {
             proxy_pass {{ $location.ProxyPass }};
+
+            {{ if $server.EnableWindowPushState }}
+            sub_filter '</html>' '{{ $windowPushStateScript }}\n</html>';
+            {{ end }}
             {{ if and $server.EnableAnalytics (not (eq $server.AnalyticsScript "")) }}
             sub_filter '</body>' "{{ $server.AnalyticsScript }}\n</body>";
+            {{ end }}
+            {{ if or $server.EnableWindowPushState (and $server.EnableAnalytics (not (eq $server.AnalyticsScript ""))) }}
             sub_filter_once off;
             {{ end }}
         }

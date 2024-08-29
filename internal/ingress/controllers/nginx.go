@@ -209,9 +209,10 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string) []conf
 						ProxyPass: fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", entrance.Host, app.Spec.Namespace, entrance.Port),
 					},
 				},
-				EnableAnalytics: enableAnalytics,
-				AnalyticsScript: analyticsScript,
-				EnableOIDC:      enableOIDC,
+				EnableAnalytics:       enableAnalytics,
+				AnalyticsScript:       analyticsScript,
+				EnableOIDC:            enableOIDC,
+				EnableWindowPushState: entrance.WindowPushState,
 			}
 			servers = append(servers, s)
 		}

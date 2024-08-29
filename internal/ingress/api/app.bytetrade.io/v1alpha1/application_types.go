@@ -48,13 +48,14 @@ type ApplicationSpec struct {
 }
 
 type Entrance struct {
-	Name      string `yaml:"name" json:"name"`
-	Host      string `yaml:"host" json:"host"`
-	Port      int32  `yaml:"port" json:"port"`
-	Icon      string `yaml:"icon" json:"icon,omitempty"`
-	Title     string `yaml:"title" json:"title"`
-	AuthLevel string `yaml:"authLevel" json:"authLevel,omitempty"`
-	Invisible bool   `yaml:"invisible,omitempty" json:"invisible,omitempty"`
+	Name            string `yaml:"name" json:"name"`
+	Host            string `yaml:"host" json:"host"`
+	Port            int32  `yaml:"port" json:"port"`
+	Icon            string `yaml:"icon" json:"icon,omitempty"`
+	Title           string `yaml:"title" json:"title"`
+	AuthLevel       string `yaml:"authLevel" json:"authLevel,omitempty"`
+	Invisible       bool   `yaml:"invisible,omitempty" json:"invisible,omitempty"`
+	WindowPushState bool   `yaml:"windowPushState,omitempty" json:"windowPushState,omitempty"`
 }
 
 // ApplicationStatus defines the observed state of Application
