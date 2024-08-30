@@ -693,7 +693,7 @@ func (h *Handler) handleUpdateLocale(req *restful.Request, resp *restful.Respons
 				}
 
 				if locale.Theme == "" {
-					locale.Theme = "white"
+					locale.Theme = "light"
 				}
 				u.Annotations[constants.UserTheme] = locale.Theme
 
