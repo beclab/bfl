@@ -752,14 +752,13 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 				return
 			}
 
-			wizard.Spec.Replicas = pointer.Int32Ptr(0)
-			_, err = deploy.Update(ctx, wizard, metav1.UpdateOptions{})
-			if err != nil {
-				klog.Error("scale deployment wizard error, ", err)
+			err = deploy.Delete(ctx, wizard.Name, metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				klog.Error("delete deployment wizard error, ", err)
 				return
 			}
 
-			klog.Info("success to scale wizard to 0")
+			klog.Info("success to delete wizard")
 		}()
 	} else {
 		admin, err := iamClient.Users().Get(ctx, constants.Username, metav1.GetOptions{})
