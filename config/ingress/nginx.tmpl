@@ -298,6 +298,11 @@ http {
             sub_filter '</html>' '{{ $windowPushStateScript }}\n</html>';
             {{ end }}
 
+            {{ if gt (len $server.Language) 0 }}
+            sub_filter '</head>' '<meta name="terminus-language" content="{{ $server.Language }}"/>\n</head>';
+            {{ end }}
+
+
             {{ if and $server.EnableAnalytics (not (eq $server.AnalyticsScript "")) }}
             sub_filter '</body>' "{{ $server.AnalyticsScript }}\n</body>";
             {{ end }}
@@ -408,6 +413,11 @@ http {
             {{ if $server.EnableWindowPushState }}
             sub_filter '</html>' '{{ $windowPushStateScript }}\n</html>';
             {{ end }}
+
+            {{ if gt (len $server.Language) 0 }}
+            sub_filter '</head>' '<meta name="terminus-language" content="{{ $server.Language }}"/>\n</head>';
+            {{ end }}
+
             {{ if and $server.EnableAnalytics (not (eq $server.AnalyticsScript "")) }}
             sub_filter '</body>' "{{ $server.AnalyticsScript }}\n</body>";
             {{ end }}

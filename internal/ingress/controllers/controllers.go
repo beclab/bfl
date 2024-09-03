@@ -353,14 +353,24 @@ func (r *NginxController) generateNginxServers() ([]config.Server, error) {
 		var isEphemeral bool
 		var _servers []config.Server
 
+		op, err := operator.NewUserOperator()
+		if err != nil {
+			return nil, err
+		}
+		user, err := op.GetUser("")
+		if err != nil {
+			return nil, err
+		}
+		language := op.GetUserAnnotation(user, "bytetrade.io/language")
+
 		if ephemeral, ok := r.sslConfigData["ephemeral"]; !ok {
-			_servers = r.addDomainServers(false, zone)
+			_servers = r.addDomainServers(false, zone, language)
 		} else {
 			isEphemeral, err = strconv.ParseBool(ephemeral)
 			if err != nil {
 				return nil, err
 			}
-			_servers = r.addDomainServers(isEphemeral, zone)
+			_servers = r.addDomainServers(isEphemeral, zone, language)
 		}
 
 		servers = append(servers, _servers...)
