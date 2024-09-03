@@ -87,7 +87,7 @@ func (r *NginxController) genNonAppServers(zone string, isEphemeral bool) []conf
 	return servers
 }
 
-func (r *NginxController) addDomainServers(isEphemeral bool, zone string) []config.Server {
+func (r *NginxController) addDomainServers(isEphemeral bool, zone string, language string) []config.Server {
 	servers := make([]config.Server, 0)
 	client := analytics.NewClient()
 
@@ -102,6 +102,7 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string) []conf
 			},
 		},
 		EnableAuth: false,
+		Language:   language,
 	}
 
 	// add analytics to profile
@@ -213,6 +214,7 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string) []conf
 				AnalyticsScript:       analyticsScript,
 				EnableOIDC:            enableOIDC,
 				EnableWindowPushState: entrance.WindowPushState,
+				Language:              language,
 			}
 			servers = append(servers, s)
 		}
