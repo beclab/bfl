@@ -715,7 +715,7 @@ func (r *NginxController) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	// watch user applications
-	return c.Watch(&source.Kind{Type: &v1alpha1App.Application{}},
+	err = c.Watch(&source.Kind{Type: &v1alpha1App.Application{}},
 		handler.EnqueueRequestsFromMapFunc(
 			func(object client.Object) []reconcile.Request {
 				return []reconcile.Request{{NamespacedName: types.NamespacedName{
@@ -734,6 +734,29 @@ func (r *NginxController) SetupWithManager(mgr ctrl.Manager) error {
 				old, ok1 := e.ObjectOld.(*v1alpha1App.Application)
 				_new, ok2 := e.ObjectNew.(*v1alpha1App.Application)
 				if !(ok1 && ok2) || reflect.DeepEqual(old.Spec, _new.Spec) {
+					return false
+				}
+				return true
+			},
+		},
+	)
+	if err != nil {
+		return err
+	}
+	return c.Watch(&source.Kind{Type: &iamV1alpha2.User{}},
+		handler.EnqueueRequestsFromMapFunc(
+			func(object client.Object) []reconcile.Request {
+				return []reconcile.Request{{NamespacedName: types.NamespacedName{
+					Namespace: object.GetNamespace(),
+					Name:      object.GetName(),
+				}}}
+			}),
+		predicate.Funcs{
+			GenericFunc: func(e event.GenericEvent) bool { return false },
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				old, ok1 := e.ObjectOld.(*iamV1alpha2.User)
+				_new, ok2 := e.ObjectNew.(*iamV1alpha2.User)
+				if !(ok1 && ok2) || old.Annotations["bytetrade.io/language"] == _new.Annotations["bytetrade.io/language"] {
 					return false
 				}
 				return true
