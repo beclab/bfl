@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -37,6 +38,8 @@ func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
 	_ = v1alpha1App.AddToScheme(scheme)
+
+	_ = iamV1alpha2.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
