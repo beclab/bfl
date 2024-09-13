@@ -736,6 +736,12 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 				response.HandleError(resp, errors.Errorf("reset password: verify password hash err, %v", err))
 				return
 			}
+
+			if passwordReset.Password == passwordReset.CurrentPassword {
+				response.HandleBadRequest(resp, errors.New("reset password: the tow passwords must be different"))
+				return
+			}
+
 		} else {
 			tokenStr := req.HeaderParameter(constants.AuthorizationTokenKey)
 			if tokenStr == "" {
@@ -755,8 +761,11 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 			}
 
 		}
-		if passwordReset.Password == passwordReset.CurrentPassword {
-			response.HandleBadRequest(resp, errors.New("reset password: the tow passwords must be different"))
+
+		user.Spec.EncryptedPassword = passwordReset.Password
+		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
+		if err != nil {
+			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
 			return
 		}
 
@@ -801,13 +810,14 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 			response.HandleError(resp, errors.New("no privilege to reset password of another user"))
 			return
 		}
-	}
 
-	user.Spec.EncryptedPassword = passwordReset.Password
-	_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
-		return
+		user.Spec.EncryptedPassword = passwordReset.Password
+		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
+		if err != nil {
+			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
+			return
+		}
+
 	}
 
 	response.SuccessNoData(resp)
