@@ -104,6 +104,9 @@ func (h *Handler) GetClusterMetric(req *restful.Request, resp *restful.Response)
 }
 
 func getValue(m *monitoring.Metric) float64 {
+	if len(m.MetricData.MetricValues) == 0 {
+		return 0.0
+	}
 	return m.MetricData.MetricValues[0].Sample[1]
 }
 
