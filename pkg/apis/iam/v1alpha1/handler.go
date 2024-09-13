@@ -24,6 +24,7 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/httpclient"
 
+	apiRuntime "bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"github.com/asaskevich/govalidator"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/pkg/errors"
@@ -729,37 +730,69 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 			return
 		}
 
-		if err = bcrypt.CompareHashAndPassword([]byte(user.Spec.EncryptedPassword),
-			[]byte(passwordReset.CurrentPassword)); err != nil {
-			response.HandleError(resp, errors.Errorf("reset password: verify password hash err, %v", err))
-			return
-		}
-		if passwordReset.Password == passwordReset.CurrentPassword {
-			response.HandleBadRequest(resp, errors.New("reset password: the tow passwords must be different"))
-			return
-		}
+		if len(passwordReset.CurrentPassword) > 0 {
+			if err = bcrypt.CompareHashAndPassword([]byte(user.Spec.EncryptedPassword),
+				[]byte(passwordReset.CurrentPassword)); err != nil {
+				response.HandleError(resp, errors.Errorf("reset password: verify password hash err, %v", err))
+				return
+			}
 
-		user.Annotations[constants.UserTerminusWizardStatus] = string(constants.Completed)
+			if passwordReset.Password == passwordReset.CurrentPassword {
+				response.HandleBadRequest(resp, errors.New("reset password: the tow passwords must be different"))
+				return
+			}
 
-		// init completed, user's wizard will be closed
-		go func() {
-			kubeClient := runtime.NewKubeClient(req)
-			deploy := kubeClient.Kubernetes().AppsV1().Deployments(constants.Namespace)
-			ctx := context.Background()
-			wizard, err := deploy.Get(ctx, "wizard", metav1.GetOptions{})
+		} else {
+			tokenStr := req.HeaderParameter(constants.AuthorizationTokenKey)
+			if tokenStr == "" {
+				response.HandleUnauthorized(resp, response.NewTokenValidationError("token not provided"))
+				return
+			}
+
+			claims, err := apiRuntime.ParseToken(tokenStr)
 			if err != nil {
-				klog.Error("find wizard deployment error, ", err)
+				response.HandleUnauthorized(resp, response.NewTokenValidationError("parse token", err))
 				return
 			}
 
-			err = deploy.Delete(ctx, wizard.Name, metav1.DeleteOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				klog.Error("delete deployment wizard error, ", err)
+			if claims.Username != constants.Username {
+				response.HandleError(resp, errors.Errorf("reset password: verify token err, invalid token"))
 				return
 			}
 
-			klog.Info("success to delete wizard")
-		}()
+		}
+
+		user.Spec.EncryptedPassword = passwordReset.Password
+		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
+		if err != nil {
+			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
+			return
+		}
+
+		if user.Annotations[constants.UserTerminusWizardStatus] != string(constants.Completed) {
+			// only initializing in progress
+			user.Annotations[constants.UserTerminusWizardStatus] = string(constants.Completed)
+
+			// init completed, user's wizard will be closed
+			go func() {
+				kubeClient := runtime.NewKubeClient(req)
+				deploy := kubeClient.Kubernetes().AppsV1().Deployments(constants.Namespace)
+				ctx := context.Background()
+				wizard, err := deploy.Get(ctx, "wizard", metav1.GetOptions{})
+				if err != nil {
+					klog.Error("find wizard deployment error, ", err)
+					return
+				}
+
+				err = deploy.Delete(ctx, wizard.Name, metav1.DeleteOptions{})
+				if err != nil && !apierrors.IsNotFound(err) {
+					klog.Error("delete deployment wizard error, ", err)
+					return
+				}
+
+				klog.Info("success to delete wizard")
+			}()
+		}
 	} else {
 		admin, err := iamClient.Users().Get(ctx, constants.Username, metav1.GetOptions{})
 		if err != nil {
@@ -777,13 +810,14 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 			response.HandleError(resp, errors.New("no privilege to reset password of another user"))
 			return
 		}
-	}
 
-	user.Spec.EncryptedPassword = passwordReset.Password
-	_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
-		return
+		user.Spec.EncryptedPassword = passwordReset.Password
+		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
+		if err != nil {
+			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
+			return
+		}
+
 	}
 
 	response.SuccessNoData(resp)
