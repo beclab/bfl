@@ -370,6 +370,10 @@ func (h *Handler) handleTerminusInfo(req *restful.Request, resp *restful.Respons
 	tInfo.Avatar = userOp.GetAvatar(user)
 	tInfo.UserDID = userOp.GetUserDID(user)
 
+	if reverseProxy := userOp.GetUserAnnotation(user, constants.UserAnnotationReverseProxyType); reverseProxy != "" {
+		tInfo.ReverseProxy = reverseProxy
+	}
+
 	response.Success(resp, tInfo)
 
 }

@@ -56,6 +56,21 @@ func AddContainer(c *restful.Container) error {
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{}))
 
+	ws.Route(ws.POST("/reverse-proxy").
+		To(handler.handleChangeReverseProxyConfig).
+		Doc("Change reverse proxy settings.").
+		Reads(ReverseProxyConfig{}).
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", response.Response{}))
+
+	ws.Route(ws.GET("/reverse-proxy").
+		To(handler.handleGetReverseProxyConfig).
+		Doc("Get reverse proxy settings.").
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", response.Response{}))
+
 	ws.Route(ws.GET("/ssl/task-state").
 		To(handler.handleGetEnableHTTPSTaskState).
 		Doc("Get enable https task state.").

@@ -40,7 +40,7 @@ const (
 	Succeeded
 
 	CheckL4Proxy
-	CheckFrpAgent
+	CheckReverseProxyAgent
 	GenerateCert
 	ConfigureIngressHTTPs
 	CheckTunnel
@@ -81,31 +81,20 @@ func GetEnableHTTPSTaskState(username string) (*TaskResult, error) {
 }
 
 type EnableHTTPSTaskOption struct {
-	GenerateURL  string
-	AccessToken  string
-	FrpEnable    bool
-	TunnelEnable bool
-	WaitTimeout  *time.Duration
+	GenerateURL        string
+	AccessToken        string
+	ReverseProxyEnable bool
+	WaitTimeout        *time.Duration
 
-	Name      string
-	FrpServer string
+	Name string
 
-	FrpNamespace          string
-	FrpDeploymentName     string
-	FrpDeploymentReplicas int32
-
-	TunnelNamespace          string
-	TunnelDeploymentName     string
-	TunnelDeploymentReplicas int32
+	ReverseProxyAgentNamespace          string
+	ReverseProxyAgentDeploymentName     string
+	ReverseProxyAgentDeploymentReplicas int32
 
 	L4ProxyNamespace          string
 	L4ProxyDeploymentName     string
 	L4ProxyDeploymentReplicas int32
-
-	PublicDomainIP *string
-	PublicCName    *string
-	LocalNodeIP    *string
-	LocalNodePort  *string
 }
 
 type EnableHTTPSTask struct {
@@ -193,23 +182,6 @@ func (t *EnableHTTPSTask) updateUserAnnotation(zone string) (err error) {
 	if err != nil {
 		return
 	}
-
-	err = t.iamUser.UpdateUserAnnotation(constants.UserAnnotationLocalDomainIp, *t.o.LocalNodeIP)
-	if err != nil {
-		return
-	}
-	if t.o.PublicDomainIP != nil {
-		err = t.iamUser.UpdateUserAnnotation(constants.UserAnnotationPublicDomainIp, *t.o.PublicDomainIP)
-		if err != nil {
-			return
-		}
-	} else if t.o.PublicCName != nil {
-		err = t.iamUser.UpdateUserAnnotation(constants.UserAnnotationPublicDomainIp, *t.o.PublicCName)
-		if err != nil {
-			return
-		}
-	}
-
 	return t.iamUser.UpdateUserAnnotation(constants.UserAnnotationIsEphemeral, "false")
 }
 
@@ -308,23 +280,6 @@ func (t *EnableHTTPSTask) Execute() {
 	var nameCertConfigMap *corev1.ConfigMap
 
 	nameCertConfigMap, err := func() (createdCm *corev1.ConfigMap, err error) {
-		// add local ip dns record
-		if err = t.cm.AddDNSRecord(nil, t.o.LocalNodeIP, nil); err != nil {
-			return nil, errors.Errorf("add zone local domain record err, %v", err)
-		}
-		// add public ip dns record
-		if t.o.PublicDomainIP != nil {
-			if err = t.cm.AddDNSRecord(t.o.PublicDomainIP, nil, nil); err != nil {
-				return nil, errors.Errorf("add zone public domain record err, %v", err)
-			}
-		} else if t.o.PublicCName != nil {
-			// add frp cname dns record
-			err = t.cm.AddDNSRecord(nil, nil, t.o.PublicCName)
-			if err != nil {
-				return nil, errors.Errorf("add frp dns record err: %v", err)
-			}
-		}
-
 		// check global l4 proxy or frp agent is ready
 		taskResult.State = CheckL4Proxy
 		t.UpdateTaskState(taskResult)
@@ -333,20 +288,11 @@ func (t *EnableHTTPSTask) Execute() {
 			return
 		}
 
-		if t.o.FrpEnable {
-			taskResult.State = CheckFrpAgent
+		if t.o.ReverseProxyEnable {
+			taskResult.State = CheckReverseProxyAgent
 			t.UpdateTaskState(taskResult)
-			if !t.waitForDeploymentReady(t.o.FrpDeploymentName, t.o.FrpNamespace, t.o.FrpDeploymentReplicas) {
-				err = fmt.Errorf("%q still not ready", t.o.FrpDeploymentName)
-				return
-			}
-		}
-
-		if t.o.TunnelEnable {
-			taskResult.State = CheckTunnel
-			t.UpdateTaskState(taskResult)
-			if !t.waitForDeploymentReady(t.o.TunnelDeploymentName, t.o.TunnelNamespace, t.o.TunnelDeploymentReplicas) {
-				err = fmt.Errorf("%q still not ready", t.o.TunnelDeploymentName)
+			if !t.waitForDeploymentReady(t.o.ReverseProxyAgentDeploymentName, t.o.ReverseProxyAgentNamespace, t.o.ReverseProxyAgentDeploymentReplicas) {
+				err = fmt.Errorf("%q still not ready", t.o.ReverseProxyAgentDeploymentName)
 				return
 			}
 		}

@@ -1,11 +1,9 @@
 package v1alpha1
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
@@ -22,15 +20,12 @@ import (
 	settingsTask "bytetrade.io/web3os/bfl/pkg/task/settings"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
-	"bytetrade.io/web3os/bfl/pkg/utils/k8sutil"
-
 	"github.com/emicklei/go-restful/v3"
 	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
 	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 )
 
@@ -87,7 +82,7 @@ func (h *Handler) handleUnbindingUserZone(req *restful.Request, resp *restful.Re
 
 	// remove frp-agent
 	if err = k8sClient.AppsV1().Deployments(constants.Namespace).Delete(ctx,
-		FrpDeploymentName, metav1.DeleteOptions{}); err != nil {
+		ReverseProxyAgentDeploymentName, metav1.DeleteOptions{}); err != nil {
 		log.Warnf("unbind user zone, delete frp-agent err, %v", err)
 	}
 
@@ -253,32 +248,50 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		return
 	}
 
-	var post PostEnableSSL
+	post := EnableHTTPSRequest{}
 	req.ReadEntity(&post)
 
 	log.Infow("enable https: post request,", "postBody", post)
 
-	if (post.IP == "" && post.FrpServer == "" && !post.EnableTunnel) ||
-		(post.IP != "" && post.FrpServer != "" && post.EnableTunnel) {
-		err = errors.New("enable https: invalid parameter, 'frp_server' or 'ip' or 'enable_tunnel' must be provided")
-		response.HandleError(resp, err)
+	if (post.IP != "" && post.EnableReverseProxy) || (post.IP == "" && !post.EnableReverseProxy) {
+		response.HandleError(resp, errors.New("bad request: one of public IP and reverse proxy should be selected"))
+		return
+	}
+
+	reverseProxyConf := &ReverseProxyConfig{}
+	if post.IP != "" {
+		reverseProxyConf.IP = post.IP
+	} else {
+		reverseProxyConf, err = GetDefaultReverseProxyConfig(ctx)
+		if err != nil {
+			response.HandleError(resp, errors.Wrap(err, "failed to get default reverse proxy config"))
+			return
+		}
+	}
+
+	reverseProxyConfigurator, err := NewReverseProxyConfigurator()
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("create reverse proxy configurator: %v", err))
+		return
+	}
+
+	if err := reverseProxyConfigurator.CheckConfig(reverseProxyConf); err != nil {
+		response.HandleError(resp, errors.Wrap(err, "invalid reverse proxy configuration"))
 		return
 	}
 
 	o := settingsTask.EnableHTTPSTaskOption{
-		Name:                      terminusName,
-		GenerateURL:               fmt.Sprintf(constants.NameBindAPICertGenerateFormat, terminusName),
-		AccessToken:               req.HeaderParameter(constants.AuthorizationTokenKey),
-		FrpDeploymentName:         FrpDeploymentName,
-		FrpDeploymentReplicas:     1,
-		TunnelDeploymentName:      CloudflaredDeploymentName,
-		TunnelDeploymentReplicas:  1,
-		L4ProxyDeploymentName:     L4ProxyDeploymentName,
-		L4ProxyDeploymentReplicas: 1,
+		Name:                                terminusName,
+		GenerateURL:                         fmt.Sprintf(constants.NameBindAPICertGenerateFormat, terminusName),
+		AccessToken:                         req.HeaderParameter(constants.AuthorizationTokenKey),
+		ReverseProxyAgentDeploymentName:     ReverseProxyAgentDeploymentName,
+		ReverseProxyAgentDeploymentReplicas: ReverseProxyAgentDeploymentReplicas,
+		L4ProxyDeploymentName:               L4ProxyDeploymentName,
+		L4ProxyDeploymentReplicas:           L4ProxyDeploymentReplicas,
 	}
 
 	// add global l4 proxy
-	namespace := utils.EnvOrDefault("L4_PROXY_NAMESPACE", constants.L4ProxyNamespace)
+	namespace := utils.EnvOrDefault("L4_PROXY_NAMESPACE", constants.OSSystemNamespace)
 	serviceAccount := utils.EnvOrDefault("L4_PROXY_SERVICE_ACCOUNT", constants.L4ProxyServiceAccountName)
 
 	k8sClient := runtime.NewKubeClient(req).Kubernetes()
@@ -304,109 +317,9 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 	}
 	o.L4ProxyNamespace = namespace
 
-	// node local ip address
-	nodeIP, err := k8sutil.GetL4ProxyNodeIP(ctx, 30*time.Second)
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("enable https: failed to get node ip, %v", err))
+	if err := reverseProxyConfigurator.Configure(ctx, reverseProxyConf); err != nil {
+		response.HandleError(resp, errors.Wrap(err, "failed to configure reverse proxy"))
 		return
-	}
-	o.LocalNodeIP = nodeIP
-	o.LocalNodePort = &portStr
-
-	switch {
-	case post.IP != "":
-		o.PublicDomainIP = pointer.String(post.IP)
-	case post.FrpServer != "":
-		var domain, frpConfig string
-
-		err = func() error {
-			// is nat network, install the frp agent for user
-			if post.FrpServer == "" {
-				return errors.New("no frp server provided")
-			}
-			o.PublicCName = pointer.String(post.FrpServer)
-
-			domain, frpConfig, err = parseFrpConfig(constants.TerminusName(terminusName), post.FrpServer)
-			if err != nil {
-				return errors.Errorf("parse frp config err: %v", err)
-			}
-			return nil
-		}()
-		if err != nil {
-			response.HandleError(resp, errors.Errorf("enable https: %v", err))
-			return
-		}
-
-		log.Infof("parsed frp config, frp_server: %s, domain: %s, frpConfig: %s", post.FrpServer, domain, frpConfig)
-
-		frpApply := NewFrpDeploymentApplyConfiguration(frpConfig, post.FrpServer)
-		createdFrp, err := k8sClient.AppsV1().Deployments(constants.Namespace).Apply(ctx,
-			&frpApply, metav1.ApplyOptions{Force: true, FieldManager: constants.ApplyPatchFieldManager})
-		if err != nil {
-			response.HandleError(resp, errors.Errorf("enable https: apply frp deployment err, %v", err))
-			return
-		}
-		o.FrpEnable = true
-		o.FrpNamespace = constants.Namespace
-		o.FrpServer = post.FrpServer
-
-		log.Debugf("created frp deployment: %s", utils.PrettyJSON(createdFrp))
-	case post.EnableTunnel:
-		// get cloudflare token
-		jws := userOp.GetUserAnnotation(user, constants.UserCertManagerJWSToken)
-		if jws == "" {
-			response.HandleError(resp, errors.Errorf("enable https: user jws not found"))
-			return
-		}
-
-		req := TunnelRequest{
-			Name:    terminusName,
-			Service: fmt.Sprintf("https://%s:%s", *o.LocalNodeIP, *o.LocalNodePort),
-		}
-
-		res, err := h.httpClient.
-			SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true}).R().
-			SetHeaders(map[string]string{
-				restful.HEADER_ContentType: restful.MIME_JSON,
-				restful.HEADER_Accept:      restful.MIME_JSON,
-				"Authorization":            "Bearer " + jws,
-			}).
-			SetBody(req).
-			SetResult(&TunnelResponse{}).
-			Post("https://terminus-dnsop.snowinning.com/tunnel")
-
-		if err != nil {
-			response.HandleError(resp, err)
-			return
-		}
-
-		if res.StatusCode() != http.StatusOK {
-			err = errors.New(string(res.Body()))
-			response.HandleError(resp, err)
-			return
-		}
-
-		responseData := res.Result().(*TunnelResponse)
-		if !responseData.Success || responseData.Data == nil || responseData.Data.Token == "" {
-			log.Errorf("get cloudflare tunnel token failed, %v", responseData)
-			err = errors.Errorf("enable https: get cloudflare tunnel token failed")
-			response.HandleError(resp, err)
-			return
-		}
-
-		tunnelApply := NewCloudflareDeploymentApplyConfiguration(responseData.Data.Token)
-
-		createdTunnel, err := k8sClient.AppsV1().Deployments(constants.Namespace).Apply(ctx,
-			&tunnelApply, metav1.ApplyOptions{Force: true, FieldManager: constants.ApplyPatchFieldManager})
-		if err != nil {
-			response.HandleError(resp, errors.Errorf("enable https: apply cloudflared deployment err, %v", err))
-			return
-		}
-
-		o.TunnelEnable = true
-		o.TunnelNamespace = constants.Namespace
-
-		log.Debugf("created cloudflared deployment: %s", utils.PrettyJSON(createdTunnel))
 	}
 
 	log.Info("creating async task to enable https")
@@ -424,6 +337,41 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 
 	task.LocalTaskQueue.Push("EnableHTTPS", enableHTTPSTask)
 	response.SuccessNoData(resp)
+}
+
+func (h *Handler) handleChangeReverseProxyConfig(req *restful.Request, resp *restful.Response) {
+	ctx := req.Request.Context()
+	conf := &ReverseProxyConfig{}
+	if err := req.ReadEntity(conf); err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	reverseProxyConfigurator, err := NewReverseProxyConfigurator()
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("create reverse proxy configurator: %v", err))
+		return
+	}
+
+	if err := reverseProxyConfigurator.CheckConfig(conf); err != nil {
+		response.HandleError(resp, errors.Wrap(err, "invalid reverse proxy config"))
+		return
+	}
+
+	if err := reverseProxyConfigurator.Configure(ctx, conf); err != nil {
+		response.HandleError(resp, errors.Wrap(err, "failed to configure reverse proxy"))
+		return
+	}
+	response.SuccessNoData(resp)
+}
+
+func (h *Handler) handleGetReverseProxyConfig(req *restful.Request, resp *restful.Response) {
+	ctx := req.Request.Context()
+	conf, err := GetReverseProxyConfig(ctx)
+	if err != nil {
+		response.HandleError(resp, errors.Wrap(err, "failed to get reverse proxy config"))
+		return
+	}
+	response.Success(resp, conf)
 }
 
 func (h *Handler) handleGetEnableHTTPSTaskState(req *restful.Request, resp *restful.Response) {

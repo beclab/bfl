@@ -336,7 +336,7 @@ type Configuration struct {
 	// Block all requests from given IPs
 	BlockCIDRs []string `json:"block-cidrs"`
 
-	// Block all requests with given User-Agent headers
+	// Block all requests with given UserName-Agent headers
 	BlockUserAgents []string `json:"block-user-agents"`
 
 	// Block all requests with given Referer headers

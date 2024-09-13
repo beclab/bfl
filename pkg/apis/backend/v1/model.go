@@ -37,6 +37,7 @@ type TerminusInfo struct {
 	Avatar          string                 `json:"avatar"`
 	TerminusID      string                 `json:"terminusId"`
 	UserDID         string                 `json:"did"`
+	ReverseProxy    string                 `json:"reverseProxy"`
 }
 
 type MyAppsParam struct {
