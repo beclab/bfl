@@ -2,6 +2,8 @@ package k8sutil
 
 import (
 	"context"
+	applyCorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	applyMetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"net"
 	"time"
 
@@ -19,7 +21,7 @@ import (
 )
 
 func GetL4ProxyNodeIP(ctx context.Context, waitTimeout time.Duration) (*string, error) {
-	return GetPodHostIPWithLabelSelector(ctx, waitTimeout, constants.L4ProxyNamespace, "app=l4-bfl-proxy")
+	return GetPodHostIPWithLabelSelector(ctx, waitTimeout, constants.OSSystemNamespace, "app=l4-bfl-proxy")
 }
 
 func GetPodHostIPWithLabelSelector(ctx context.Context, waitTimeout time.Duration, namespace, labelSelector string) (*string, error) {
@@ -96,4 +98,42 @@ func GetMasterExternalIP(ctx context.Context) *string {
 	}
 
 	return pointer.String(externalIP)
+}
+
+func GetConfigMapData(ctx context.Context, ns, name string) (map[string]string, error) {
+	kc, err := runtime.NewKubeClientInCluster()
+	if err != nil {
+		log.Warnf("new kube client: %v", err)
+		return nil, err
+	}
+	cm, err := kc.Kubernetes().CoreV1().ConfigMaps(ns).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return cm.Data, nil
+}
+
+func WriteConfigMapData(ctx context.Context, ns, name string, data map[string]string) error {
+	kc, err := runtime.NewKubeClientInCluster()
+	if err != nil {
+		log.Warnf("new kube client: %v", err)
+		return err
+	}
+	cmApply := &applyCorev1.ConfigMapApplyConfiguration{
+		TypeMetaApplyConfiguration: applyMetav1.TypeMetaApplyConfiguration{
+			Kind:       pointer.String("ConfigMap"),
+			APIVersion: pointer.String(corev1.SchemeGroupVersion.String()),
+		},
+		ObjectMetaApplyConfiguration: &applyMetav1.ObjectMetaApplyConfiguration{
+			Name:      pointer.String(name),
+			Namespace: pointer.String(ns),
+		},
+		Data: data,
+	}
+	_, err = kc.Kubernetes().CoreV1().ConfigMaps(ns).Apply(
+		ctx,
+		cmApply,
+		metav1.ApplyOptions{FieldManager: constants.ApplyPatchFieldManager},
+	)
+	return err
 }

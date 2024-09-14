@@ -1,28 +1,18 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"os"
-	"time"
-
-	"bytetrade.io/web3os/bfl/internal/frpc"
 	"bytetrade.io/web3os/bfl/internal/frpc/controllers"
 	"bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
-	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
-	"bytetrade.io/web3os/bfl/pkg/constants"
-
-	"github.com/go-resty/resty/v2"
+	v1alpha2 "bytetrade.io/web3os/bfl/pkg/apis/settings/v1alpha1"
+	"flag"
+	"fmt"
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
-)
-
-const (
-	MAX_RETRY_COUNT = 5
 )
 
 var (
@@ -31,15 +21,13 @@ var (
 )
 
 var (
-	user      string
-	frpServer string
+	server     string
+	port       int
+	authMethod string
+	username   string
+	authToken  string
 
-	metricsAddr             string
-	probeAddr               string
-	enableLeaderElection    bool
-	enableFrpc              bool
-	frpClientConfigMap      string
-	frpClientConfigMapLabel string
+	defaultPort int = 7000
 )
 
 func init() {
@@ -50,23 +38,24 @@ func init() {
 }
 
 func flags() error {
-	flag.StringVar(&user, "user", "", "The fprc owner username")
-	flag.StringVar(&frpServer, "frp-server", "", "The fprc server")
-	flag.BoolVar(&enableFrpc, "enable-frpc", true, "Run frpc process")
+	flag.StringVar(&server, v1alpha2.FRPOptionServer, "", "The fprc server host")
+	flag.IntVar(&port, v1alpha2.FRPOptionPort, defaultPort, "The frp-server port")
+	flag.StringVar(&authMethod, v1alpha2.FRPOptionAuthMethod, "", "The frp auth method")
+	flag.StringVar(&username, v1alpha2.FRPOptionUserName, "", "The terminus user's username")
+	flag.StringVar(&authToken, v1alpha2.FRPOptionAuthToken, "", "The token, if auth method is token")
 	flag.Parse()
 
-	// required
-	if user == "" {
-		return fmt.Errorf("missing flag 'user'")
+	if server == "" {
+		return fmt.Errorf("missing flag 'server'")
 	}
 
-	if frpServer == "" {
-		return fmt.Errorf("missing flag 'frp-server'")
+	if username == "" {
+		return errors.New("missing flag 'username'")
 	}
 
-	constants.Username = user
-
-	setupLog.Info("Frpc flags", "username", constants.Username)
+	if authMethod == v1alpha2.FRPAuthMethodToken && authToken == "" {
+		return errors.New("auth method is selected as token but no token is provided")
+	}
 
 	return nil
 }
@@ -77,78 +66,46 @@ func main() {
 	}))
 
 	if err := flags(); err != nil {
-		setupLog.Error(err, "flag error")
+		setupLog.Error(err, "invalid options")
 		os.Exit(1)
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
-		HealthProbeBindAddress: probeAddr,
+		Scheme: scheme,
+		Port:   9443,
 	})
-
-	frpc := controllers.FrpcController{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		Log:            ctrl.Log.WithName("controllers").WithName("FrpcController"),
-		Eventer:        mgr.GetEventRecorderFor("frpc-controller"),
-		HttpClient:     resty.New().SetTimeout(5 * time.Second),
-		ReconcileQueue: make(chan string, frpc.QueueSize),
+	if err != nil {
+		setupLog.Error(err, "failed to start manager")
+		os.Exit(1)
 	}
 
-	constants.FrpServer = getFrpServer()
+	frpController := controllers.FrpcController{
+		Client: mgr.GetClient(),
+		Config: &controllers.FRPCConfig{
+			Server:     server,
+			Port:       port,
+			AuthMethod: authMethod,
+			UserName:   username,
+			AuthToken:  authToken,
+		},
+		Log:            ctrl.Log.WithName("controllers").WithName("FrpcController"),
+		ReconcileQueue: make(chan string, controllers.QueueSize),
+	}
 
-	if err = frpc.SetupWithManager(mgr); err != nil {
+	if err = frpController.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller FrpcController")
 		os.Exit(1)
 	}
-	// +kubebuilder:scaffold:builder
 
-	if enableFrpc {
-		setupLog.Info("Start frpc process, using default frpc.ini")
-		if err = frpc.RunFrpc(); err != nil {
-			setupLog.Error(err, "unable to run frpc process")
-			os.Exit(1)
-		}
+	globalContext := ctrl.SetupSignalHandler()
+
+	if err = frpController.RunFrpc(globalContext); err != nil {
+		setupLog.Error(err, "unable to run frpc process")
+		os.Exit(1)
 	}
 
-	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = mgr.Start(globalContext); err != nil {
 		setupLog.Error(err, "unable to start frpc")
 		os.Exit(1)
 	}
-}
-
-func getFrpServer() string {
-	var retry int
-	var publicDomainIp string
-	var userOp, err = operator.NewUserOperator()
-	if err != nil {
-		return frpServer
-	}
-
-	var stopCh = make(chan struct{})
-	wait.Until(func() {
-		retry = retry + 1
-		user, err := userOp.GetUser(constants.Username)
-		if err != nil {
-			return
-		}
-
-		publicDomainIp = userOp.GetUserAnnotation(user, constants.UserAnnotationPublicDomainIp)
-		if retry < MAX_RETRY_COUNT && publicDomainIp == "" {
-			setupLog.Info(fmt.Sprintf("Frpc start get frpServer from crd failed, continue..."))
-			return
-		}
-
-		close(stopCh)
-	}, 5*time.Second, stopCh)
-
-	if publicDomainIp == "" {
-		setupLog.Info(fmt.Sprintf("Frpc start set frpServer from args %s, retries: %d", frpServer, retry))
-		publicDomainIp = frpServer
-	} else {
-		setupLog.Info(fmt.Sprintf("Frpc start set frpServer from user, retries: %d", retry))
-	}
-	return publicDomainIp
 }

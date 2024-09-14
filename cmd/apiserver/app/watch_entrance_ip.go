@@ -62,21 +62,21 @@ func watch(ctx context.Context) (err error) {
 
 func reconcile(ctx context.Context, terminusName constants.TerminusName, zone string, op *operator.UserOperator, user *iamV1alpha2.User) (err error) {
 	var (
-		isFrp                                       bool
+		isPublicIP                                  bool
 		isCloudFlareTunnel                          bool
 		publicDomainIp, localDomainIp, natGatewayIp string
 	)
-
-	publicDomainIp = op.GetUserAnnotation(user, constants.UserAnnotationPublicDomainIp)
-	if publicDomainIp != "" {
-		if utils.ListContains(constants.FrpServers, publicDomainIp) {
-			isFrp = true
-		}
-	} else {
-		// FIXME: assume publicDomainIp is empty cloudflare tunnel should be enabled
+	switch reverseProxyType := op.GetUserAnnotation(user, constants.UserAnnotationReverseProxyType); reverseProxyType {
+	case "":
+		log.Warnf("user %q's network is not set up yet", user.Name)
+		return nil
+	case constants.ReverseProxyTypeNone:
+		isPublicIP = true
+	case constants.ReverseProxyTypeCloudflare:
 		isCloudFlareTunnel = true
 	}
 
+	publicDomainIp = op.GetUserAnnotation(user, constants.UserAnnotationPublicDomainIp)
 	localDomainIp = op.GetUserAnnotation(user, constants.UserAnnotationLocalDomainIp)
 	if localDomainIp == "" {
 		log.Warnf("user %q no local domain ip", user.Name)
@@ -88,7 +88,7 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 	cm := certmanager.NewCertManager(terminusName)
 
 	var userPatches []func(*iamV1alpha2.User)
-	if !isFrp && publicDomainIp != "" {
+	if isPublicIP {
 		// only for public ip
 		publicIp := ""
 		if role, ok := user.Annotations[constants.UserAnnotationOwnerRole]; ok && role == constants.RolePlatformAdmin {

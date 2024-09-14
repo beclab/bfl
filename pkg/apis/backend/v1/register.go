@@ -33,7 +33,7 @@ func AddContainer(c *restful.Container) error {
 
 	ws.Route(ws.GET("/user-info").
 		To(handler.handleUserInfo).
-		Doc("User information.").
+		Doc("UserName information.").
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{}))
 

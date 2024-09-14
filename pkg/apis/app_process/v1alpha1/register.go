@@ -49,7 +49,7 @@ func AddToContainer(c *restful.Container) error {
 		Doc("List user's apps").
 		Metadata(restfulspec.KeyOpenAPITags, MODULE_TAGS).
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Returns(http.StatusOK, "User's app list", response.Response{}))
+		Returns(http.StatusOK, "UserName's app list", response.Response{}))
 
 	ws.Route(ws.GET("/allapps").
 		To(handler.handleListAllApps).

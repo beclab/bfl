@@ -45,7 +45,6 @@ var (
 	UserAnnotationLimitsMemoryKey = "bytetrade.io/user-memory-limit"
 
 	MyAppsIsLocalKey = "my-apps-is-local"
-	FrpServer        string
 )
 
 var (
@@ -119,15 +118,22 @@ var (
 
 	L4ListenSSLPort = "443"
 
-	L4ProxyNamespace = "os-system" // "kubesphere-system"
+	// L4ListenSSLProxyProtocolPort is the one
+	// with "listen xxx proxy_protocol",
+	// which reads the proxy protocol header upon tcp initialization
+	// for proxy agent with proxy protocol data
+	// this port must be used to proxy traffic
+	L4ListenSSLProxyProtocolPort = "444"
 
-	L4ProxySSLPort = 444
+	OSSystemNamespace = "os-system" // "kubesphere-system"
 
 	L4ProxyServiceAccountName = "os-internal" // "kubesphere"
 
-	L4ProxyImage     = "beclab/l4-bfl-proxy"
-	FrpcImage        = "beclab/frpc"
-	CloudflaredImage = "cloudflare/cloudflared"
+	L4ProxyImage                     = "beclab/l4-bfl-proxy"
+	ReverseProxyAgentImage           = "beclab/reverse-proxy"
+	ReverseProxyAgentImageVersion    = "v0.1.0"
+	DefaultReverseProxyConfigMapName = "default-reverse-proxy-config"
+	ReverseProxyConfigMapName        = "reverse-proxy-config"
 
 	ApplyPatchFieldManager = "application/apply-patch"
 
@@ -166,14 +172,10 @@ var (
 
 	UserAnnotationNatGatewayIp = fmt.Sprintf("%s/nat-gateway-ip", AnnotationGroup)
 
-	FrpDeploymentName = "frp-agent"
-
-	FrpServers = []string{
-		"frp-east-1.snowinning.com",
-		"frp-hk.snowinning.com",
-		"frp.snowinning.com",
-		"frp-new.snowinning.com",
-	}
+	UserAnnotationReverseProxyType = fmt.Sprintf("%s/reverse-proxy-type", AnnotationGroup)
+	ReverseProxyTypeFRP            = "frp"
+	ReverseProxyTypeCloudflare     = "cloudflare"
+	ReverseProxyTypeNone           = "none"
 )
 
 var (

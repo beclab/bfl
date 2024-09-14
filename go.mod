@@ -15,7 +15,6 @@ require (
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-resty/resty/v2 v2.5.0
 	github.com/json-iterator/go v1.1.12
-	github.com/mitchellh/go-ps v1.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/common v0.37.0
