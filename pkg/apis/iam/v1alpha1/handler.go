@@ -763,12 +763,6 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		}
 
 		user.Spec.EncryptedPassword = passwordReset.Password
-		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
-		if err != nil {
-			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
-			return
-		}
-
 		if user.Annotations[constants.UserTerminusWizardStatus] != string(constants.Completed) {
 			// only initializing in progress
 			user.Annotations[constants.UserTerminusWizardStatus] = string(constants.Completed)
@@ -792,6 +786,13 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 
 				klog.Info("success to delete wizard")
 			}()
+
+			_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
+			if err != nil {
+				response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
+				return
+			}
+
 		}
 	} else {
 		admin, err := iamClient.Users().Get(ctx, constants.Username, metav1.GetOptions{})
