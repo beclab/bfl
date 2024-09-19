@@ -158,7 +158,7 @@ func NewUserspaceRoleBinding(username, userspace, role string) *UserspaceRoleBin
 		Subjects: []rbacv1.Subject{
 			{
 				APIGroup: "rbac.authorization.k8s.io",
-				Kind:     "UserName",
+				Kind:     "User",
 				Name:     username,
 			},
 		},
