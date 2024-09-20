@@ -63,7 +63,6 @@ type = "http"
 localPort = 80
 localIp = "{{ .L4ProxyIP }}"
 customDomains = ["{{ .UserZone }}"]
-transport.proxyProtocolVersion = "v1"
 
 [[proxies]]
 name = "web_wildcard"
@@ -71,7 +70,6 @@ type = "http"
 localPort = 80
 localIp = "{{ .L4ProxyIP }}"
 customDomains = ["*.{{ .UserZone }}"]
-transport.proxyProtocolVersion = "v1"
 
 [[proxies]]
 name = "web_ssl"
