@@ -64,6 +64,7 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 	var (
 		isPublicIP                                  bool
 		isCloudFlareTunnel                          bool
+		isFRP                                       bool
 		publicDomainIp, localDomainIp, natGatewayIp string
 	)
 	switch reverseProxyType := op.GetUserAnnotation(user, constants.UserAnnotationReverseProxyType); reverseProxyType {
@@ -74,6 +75,8 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 		isPublicIP = true
 	case constants.ReverseProxyTypeCloudflare:
 		isCloudFlareTunnel = true
+	case constants.ReverseProxyTypeFRP:
+		isFRP = true
 	}
 
 	publicDomainIp = op.GetUserAnnotation(user, constants.UserAnnotationPublicDomainIp)
@@ -193,6 +196,12 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 				return err
 			}
 		} // end of cloudflare tunnel
+		if isFRP {
+			err = k8sutil.RolloutRestartDeployment(ctx, constants.Namespace, v1alpha1.ReverseProxyAgentDeploymentName)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return

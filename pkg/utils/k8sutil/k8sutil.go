@@ -2,6 +2,7 @@ package k8sutil
 
 import (
 	"context"
+	"fmt"
 	applyCorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	applyMetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"net"
@@ -16,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/pointer"
 )
@@ -136,4 +138,25 @@ func WriteConfigMapData(ctx context.Context, ns, name string, data map[string]st
 		metav1.ApplyOptions{FieldManager: constants.ApplyPatchFieldManager},
 	)
 	return err
+}
+
+func RolloutRestartDeployment(ctx context.Context, ns, name string) error {
+	kc, err := runtime.NewKubeClientInCluster()
+	if err != nil {
+		log.Warnf("new kube client: %v", err)
+		return err
+	}
+	patchData := fmt.Sprintf(
+		`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`,
+		time.Now().Format(time.RFC3339))
+	_, err = kc.Kubernetes().AppsV1().Deployments(ns).Patch(
+		ctx,
+		name,
+		apitypes.StrategicMergePatchType,
+		[]byte(patchData),
+		metav1.PatchOptions{})
+	if err != nil {
+		return errors.Errorf("failed to patch deployment %s: %v", name, err)
+	}
+	return nil
 }
