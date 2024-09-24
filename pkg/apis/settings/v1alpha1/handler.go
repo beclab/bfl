@@ -600,26 +600,30 @@ func (h *Handler) handleUpdateLocale(req *restful.Request, resp *restful.Respons
 
 	defer func() {
 		if err != nil {
-			if e := userOp.UpdateUser(user, []func(*iamV1alpha2.User){
-				func(u *iamV1alpha2.User) {
-					u.Annotations[constants.UserTerminusWizardStatus] = string(constants.SystemActivateFailed)
-				},
-			}); e != nil {
-				klog.Errorf("update user err, %v", err)
+			if user.Annotations[constants.UserTerminusWizardStatus] != string(constants.Completed) {
+				if e := userOp.UpdateUser(user, []func(*iamV1alpha2.User){
+					func(u *iamV1alpha2.User) {
+						u.Annotations[constants.UserTerminusWizardStatus] = string(constants.SystemActivateFailed)
+					},
+				}); e != nil {
+					klog.Errorf("update user err, %v", err)
+				}
 			}
 		}
 	}()
 
-	err = userOp.UpdateUser(user, []func(*iamV1alpha2.User){
-		func(u *iamV1alpha2.User) {
-			u.Annotations[constants.UserTerminusWizardStatus] = string(constants.SystemActivating)
-		},
-	})
+	if user.Annotations[constants.UserTerminusWizardStatus] != string(constants.Completed) {
+		err = userOp.UpdateUser(user, []func(*iamV1alpha2.User){
+			func(u *iamV1alpha2.User) {
+				u.Annotations[constants.UserTerminusWizardStatus] = string(constants.SystemActivating)
+			},
+		})
 
-	if err != nil {
-		klog.Errorf("update user err, %v", err)
-		response.HandleError(resp, errors.Errorf("update user locale data error: %v", err))
-		return
+		if err != nil {
+			klog.Errorf("update user err, %v", err)
+			response.HandleError(resp, errors.Errorf("update user locale data error: %v", err))
+			return
+		}
 	}
 
 	err = req.ReadEntity(&locale)
@@ -645,7 +649,9 @@ func (h *Handler) handleUpdateLocale(req *restful.Request, resp *restful.Respons
 				}
 				u.Annotations[constants.UserTheme] = locale.Theme
 
-				u.Annotations[constants.UserTerminusWizardStatus] = string(constants.WaitActivateNetwork)
+				if u.Annotations[constants.UserTerminusWizardStatus] != string(constants.Completed) {
+					u.Annotations[constants.UserTerminusWizardStatus] = string(constants.WaitActivateNetwork)
+				}
 			},
 		}); err != nil {
 			return errors.Errorf("update user err, %v", err)
