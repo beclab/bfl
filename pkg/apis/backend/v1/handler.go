@@ -341,7 +341,7 @@ func (h *Handler) handleTerminusInfo(req *restful.Request, resp *restful.Respons
 		tInfo.WizardStatus = constants.WizardStatus(status)
 	}
 
-	selfhosted, osVersion, err := userOp.SelfhostedAndOsVersion()
+	selfhosted, terminusd, osVersion, err := userOp.SelfhostedAndOsVersion()
 	if err != nil {
 		response.HandleError(resp, errors.Errorf("terminus info: get terminus host type err: %v", err))
 		return
@@ -349,6 +349,11 @@ func (h *Handler) handleTerminusInfo(req *restful.Request, resp *restful.Respons
 
 	tInfo.Selfhosted = selfhosted
 	tInfo.OsVersion = osVersion
+
+	tInfo.Terminusd = "0"
+	if terminusd {
+		tInfo.Terminusd = "1"
+	}
 
 	terminusId, err := userOp.GetTerminusID()
 	if err != nil {

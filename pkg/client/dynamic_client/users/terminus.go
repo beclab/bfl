@@ -90,6 +90,7 @@ type GithubRepository struct {
 
 const SettingsDomainNameKey = "domainName"
 const SettingsSelfhostedKey = "selfhosted"
+const SettingsTerminusdKey = "terminusd"
 
 type ResourceTerminusClient struct {
 	c *dynamic_client.ResourceDynamicClient
