@@ -11,6 +11,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 	"kubesphere.io/kubesphere/pkg/server/errors"
 )
@@ -242,20 +243,33 @@ func (o *UserOperator) GetDomain() (string, error) {
 
 }
 
-func (o *UserOperator) SelfhostedAndOsVersion() (bool, string, error) {
+func (o *UserOperator) SelfhostedAndOsVersion() (selfhosted, terminusd bool, version string, err error) {
 	terminus, err := o.terminusClient.Get(o.ctx, "terminus", metav1.GetOptions{})
 	if err != nil {
-		return false, "", err
+		return false, false, "", err
 	}
+
+	version = terminus.Spec.Version
 
 	if selfhostedValue, ok := terminus.Spec.Settings[users.SettingsSelfhostedKey]; !ok {
-		return false, "", errors.New("terminus selfhosted not found")
+		selfhosted = true
+		return
 	} else {
-		selfhosted, err := strconv.ParseBool(selfhostedValue)
-		version := terminus.Spec.Version
-
-		return selfhosted, version, err
+		selfhosted, err = strconv.ParseBool(selfhostedValue)
+		if err != nil {
+			klog.Error("parse selfhosted value error", err)
+			return
+		}
 	}
+
+	if terminusdValue, ok := terminus.Spec.Settings[users.SettingsTerminusdKey]; !ok {
+		terminusd = true
+		return
+	} else {
+		terminusd = terminusdValue == "1"
+	}
+
+	return
 }
 
 func (o *UserOperator) GetTerminusID() (string, error) {
