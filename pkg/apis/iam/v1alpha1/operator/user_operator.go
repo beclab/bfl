@@ -263,7 +263,7 @@ func (o *UserOperator) SelfhostedAndOsVersion() (selfhosted, terminusd bool, ver
 	}
 
 	if terminusdValue, ok := terminus.Spec.Settings[users.SettingsTerminusdKey]; !ok {
-		terminusd = true
+		terminusd = false
 		return
 	} else {
 		terminusd = terminusdValue == "1"
