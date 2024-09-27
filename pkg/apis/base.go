@@ -1,12 +1,16 @@
 package apis
 
 import (
+	"context"
 	"fmt"
 
+	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 
 	"github.com/emicklei/go-restful/v3"
+	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Base struct {
@@ -85,4 +89,21 @@ func (b *Base) GetAllAppViaToken(req *restful.Request, appService *app_service.C
 
 	return user, apps, err
 
+}
+
+func (b *Base) IsAdminUser(ctx context.Context) (bool, error) {
+	kc, err := runtime.NewKubeClientInCluster()
+	if err != nil {
+		return false, err
+	}
+
+	user, err := kc.KubeSphere().IamV1alpha2().Users().Get(ctx, constants.Username, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	role, ok := user.Annotations[constants.UserAnnotationOwnerRole]
+	if !ok {
+		return false, errors.Errorf("invalid user %q, no owner role annotation", user.Name)
+	}
+	return role == constants.RolePlatformAdmin, nil
 }

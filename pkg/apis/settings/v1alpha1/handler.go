@@ -11,6 +11,7 @@ import (
 
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/api/response"
+	"bytetrade.io/web3os/bfl/pkg/apis"
 	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
@@ -30,6 +31,7 @@ import (
 )
 
 type Handler struct {
+	apis.Base
 	appServiceClient *app_service.Client
 	httpClient       *resty.Client
 	eventClient      *event.Client
