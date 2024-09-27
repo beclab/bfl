@@ -16,6 +16,24 @@ import (
 	"kubesphere.io/kubesphere/pkg/simple/client/monitoring"
 )
 
+var UnitTypes = map[string]struct {
+	Conditions []float64
+	Units      []string
+}{
+	"cpu": {
+		Conditions: []float64{0.1, 0},
+		Units:      []string{"core", "m"},
+	},
+	"memory": {
+		Conditions: []float64{math.Pow(1024, 4), math.Pow(1024, 3), math.Pow(1024, 2), 1024, 0},
+		Units:      []string{"Ti", "Gi", "Mi", "Ki", "Bytes"},
+	},
+	"disk": {
+		Conditions: []float64{math.Pow(10240, 4), math.Pow(1024, 3), math.Pow(1024, 2), 1024, 0},
+		Units:      []string{"Ti", "Gi", "Mi", "Ki", "Bytes"},
+	},
+}
+
 type Handler struct {
 }
 
@@ -95,10 +113,9 @@ func (h *Handler) GetClusterMetric(req *restful.Request, resp *restful.Response)
 		}
 	}
 
-	roundToGB := func(v float64) float64 { return math.Round((v/1000000000.00)*100.00) / 100.00 }
-	fmtMetricsValue(&clusterMetrics.CPU, "Cores", func(v float64) float64 { return v })
-	fmtMetricsValue(&clusterMetrics.Memory, "GB", roundToGB)
-	fmtMetricsValue(&clusterMetrics.Disk, "GB", roundToGB)
+	fmtMetricsValue(&clusterMetrics.CPU, "cpu")
+	fmtMetricsValue(&clusterMetrics.Memory, "memory")
+	fmtMetricsValue(&clusterMetrics.Disk, "disk")
 
 	response.Success(resp, clusterMetrics)
 }
@@ -110,10 +127,60 @@ func getValue(m *monitoring.Metric) float64 {
 	return m.MetricData.MetricValues[0].Sample[1]
 }
 
-func fmtMetricsValue(v *MetricValue, unit string, unitFunc func(float64) float64) {
-	v.Unit = unit
-
-	v.Usage = unitFunc(v.Usage)
-	v.Total = unitFunc(v.Total)
+func fmtMetricsValue(v *MetricValue, unitType string) {
 	v.Ratio = math.Round((v.Usage / v.Total) * 100)
+
+	v.Unit = getSuitableUnit(v.Total, unitType)
+	v.Usage = getValueByUnit(v.Usage, v.Unit)
+	v.Total = getValueByUnit(v.Total, v.Unit)
+}
+
+func getSuitableUnit(value float64, unitType string) string {
+	config, ok := UnitTypes[unitType]
+	if !ok {
+		return ""
+	}
+	result := config.Units[len(config.Units)-1]
+
+	for i, condition := range config.Conditions {
+		if value >= condition {
+			result = config.Units[i]
+			break
+		}
+	}
+	return result
+}
+
+func getValueByUnit(num float64, unit string) float64 {
+
+	switch unit {
+	case "", "default":
+		return num
+	case "%":
+		num *= 100
+	case "m":
+		num *= 1000
+		if num < 1 {
+			return 0
+		}
+	case "Ki":
+		num /= 1024
+	case "Mi":
+		num /= math.Pow(1024, 2)
+	case "Gi":
+		num /= math.Pow(1024, 3)
+	case "Ti":
+		num /= math.Pow(1024, 4)
+	case "Bytes", "B":
+	case "K", "KB":
+		num /= 1000
+	case "M", "MB":
+		num /= math.Pow(1000, 2)
+	case "G", "GB":
+		num /= math.Pow(1000, 3)
+	case "T", "TB":
+		num /= math.Pow(1000, 4)
+	}
+
+	return math.Round(num*100) / 100
 }
