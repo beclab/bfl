@@ -45,10 +45,14 @@ const (
 	AppServiceAppSubjectListTempl          = "http://%s:%s/app-service/v1/apps/%s/subject"
 
 	AppServiceAppPermissionTempl   = "http://%s:%s/app-service/v1/perms/%s"
-	AppserviceProvideRegistryTempl = "http://%s:%s/app-service/v1/perms/provider-registry/%s/%s/%s"
+	AppServiceProvideRegistryTempl = "http://%s:%s/app-service/v1/perms/provider-registry/%s/%s/%s"
 
 	AppServiceAppSuspendURLTempl = "http://%s:%s/app-service/v1/apps/%s/suspend"
 	AppServiceAppResumeURLTempl  = "http://%s:%s/app-service/v1/apps/%s/resume"
+
+	AppServiceEnableGpuManagedMemoryURLTempl  = "http://%s:%s/app-service/v1/gpu/enable/managed-memory"
+	AppServiceDisableGpuManagedMemoryURLTempl = "http://%s:%s/app-service/v1/gpu/disable/managed-memory"
+	AppServiceGetGpuManagedMemoryURLTempl     = "http://%s:%s/app-service/v1/gpu/managed-memory"
 
 	AppServiceHostEnv = "APP_SERVICE_SERVICE_HOST"
 	AppServicePortEnv = "APP_SERVICE_SERVICE_PORT"
@@ -370,7 +374,7 @@ func (c *Client) GetApplicationPermission(token, app string) (map[string]interfa
 func (c *Client) GetProviderRegistry(token, dataType, group, version string) (map[string]interface{}, error) {
 	appServiceHost := os.Getenv(AppServiceHostEnv)
 	appServicePort := os.Getenv(AppServicePortEnv)
-	urlStr := fmt.Sprintf(AppserviceProvideRegistryTempl, appServiceHost, appServicePort, dataType, group, version)
+	urlStr := fmt.Sprintf(AppServiceProvideRegistryTempl, appServiceHost, appServicePort, dataType, group, version)
 	return c.doHttpGetOne(urlStr, token)
 }
 
@@ -396,4 +400,27 @@ func (c *Client) ListAllAppInfosByAdmin(token string) ([]*AppInfo, error) {
 	}
 
 	return c.getAppListFromData(app)
+}
+
+func (c *Client) EnableGpuManagedMemory(token string) (map[string]interface{}, error) {
+	appServiceHost := os.Getenv(AppServiceHostEnv)
+	appServicePort := os.Getenv(AppServicePortEnv)
+	urlStr := fmt.Sprintf(AppServiceEnableGpuManagedMemoryURLTempl, appServiceHost, appServicePort)
+
+	return c.doHttpPost(urlStr, token, nil)
+}
+
+func (c *Client) DisableGpuManagedMemory(token string) (map[string]interface{}, error) {
+	appServiceHost := os.Getenv(AppServiceHostEnv)
+	appServicePort := os.Getenv(AppServicePortEnv)
+	urlStr := fmt.Sprintf(AppServiceDisableGpuManagedMemoryURLTempl, appServiceHost, appServicePort)
+
+	return c.doHttpPost(urlStr, token, nil)
+}
+
+func (c *Client) GetGpuManagedMemory(token string) (map[string]interface{}, error) {
+	appServiceHost := os.Getenv(AppServiceHostEnv)
+	appServicePort := os.Getenv(AppServicePortEnv)
+	urlStr := fmt.Sprintf(AppServiceGetGpuManagedMemoryURLTempl, appServiceHost, appServicePort)
+	return c.doHttpGetOne(urlStr, token)
 }

@@ -414,6 +414,28 @@ func AddContainer(c *restful.Container) error {
 		Param(ws.PathParameter("plan_name", "backup plan name").DataType("string").Required(true)).
 		Returns(http.StatusOK, "", &response.Response{}))
 
+	// GPU
+	ws.Route(ws.GET("/gpu/managed-memory").
+		To(handler.handleGetGpuManagedMemory).
+		Doc("get gpu managed memory enabled or not").
+		Metadata(restfulspec.KeyOpenAPITags, []string{"gpu"}).
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Returns(http.StatusOK, "", &response.Response{}))
+
+	ws.Route(ws.POST("/gpu/enable/managed-memory").
+		To(handler.handleEnableGpuManagedMemory).
+		Doc("enable gpu managed memory").
+		Metadata(restfulspec.KeyOpenAPITags, []string{"gpu"}).
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Returns(http.StatusOK, "", &response.Response{}))
+
+	ws.Route(ws.POST("/gpu/disable/managed-memory").
+		To(handler.handleDisableGpuManagedMemory).
+		Doc("disable gpu managed memory").
+		Metadata(restfulspec.KeyOpenAPITags, []string{"gpu"}).
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Returns(http.StatusOK, "", &response.Response{}))
+
 	c.Add(ws)
 	return nil
 }
