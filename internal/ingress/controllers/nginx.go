@@ -40,7 +40,7 @@ type NonAppServer struct {
 	AnalyticsEnabled bool
 }
 
-func (r *NginxController) genNonAppServers(zone string, isEphemeral bool) []config.Server {
+func (r *NginxController) genNonAppServers(zone string, isEphemeral bool, language string) []config.Server {
 	servers := make([]config.Server, 0)
 	client := analytics.NewClient()
 	for _, app := range nonAppServers {
@@ -82,6 +82,7 @@ func (r *NginxController) genNonAppServers(zone string, isEphemeral bool) []conf
 			},
 			EnableAnalytics: enableAnalytics,
 			AnalyticsScript: analyticsScript,
+			Language:        language,
 		})
 	}
 	return servers
@@ -221,7 +222,7 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 	}
 
 	// add non application servers
-	_servers := r.genNonAppServers(zone, isEphemeral)
+	_servers := r.genNonAppServers(zone, isEphemeral, language)
 
 	if _servers != nil && len(_servers) > 0 {
 		servers = append(servers, _servers...)
