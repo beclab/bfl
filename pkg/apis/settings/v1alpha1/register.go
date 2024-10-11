@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"bytetrade.io/web3os/bfl/pkg/api/response"
+	"bytetrade.io/web3os/bfl/pkg/apis"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
@@ -114,11 +115,11 @@ func AddContainer(c *restful.Container) error {
 		Doc("Update user locale.").
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Reads(PostLocale{}).
+		Reads(apis.PostLocale{}).
 		Returns(http.StatusOK, "", response.Response{}))
 
 	ws.Route(ws.GET("/config-system").
-		To(handler.handleGetSysConfig).
+		To(handler.HandleGetSysConfig).
 		Doc("get user locale.").
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Metadata(restfulspec.KeyOpenAPITags, tags).

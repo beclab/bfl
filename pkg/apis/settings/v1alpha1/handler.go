@@ -587,7 +587,7 @@ func (h *Handler) handleUpdatePublicDomainAccessPolicy(req *restful.Request, res
 }
 
 func (h *Handler) handleUpdateLocale(req *restful.Request, resp *restful.Response) {
-	var locale PostLocale
+	var locale apis.PostLocale
 	userOp, err := operator.NewUserOperator()
 	if err != nil {
 		response.HandleError(resp, errors.Errorf("update user locale err: new user operator err, %v", err))
@@ -745,23 +745,4 @@ func (h *Handler) handlerUpdateUserAvatar(req *restful.Request, resp *restful.Re
 	}
 
 	response.SuccessNoData(resp)
-}
-
-func (h *Handler) handleGetSysConfig(req *restful.Request, resp *restful.Response) {
-	userOp, err := operator.NewUserOperator()
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("update user avatar err: new user operator err, %v", err))
-		return
-	}
-	user, err := userOp.GetUser(constants.Username)
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("get user sys config err: get user err, %v", err))
-		return
-	}
-	cfg := PostLocale{
-		Language: user.Annotations[constants.UserLanguage],
-		Location: user.Annotations[constants.UserLocation],
-		Theme:    user.Annotations[constants.UserTheme],
-	}
-	response.Success(resp, &cfg)
 }

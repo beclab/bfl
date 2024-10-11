@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"bytetrade.io/web3os/bfl/pkg/api/response"
+	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
@@ -14,6 +16,13 @@ import (
 )
 
 type Base struct {
+}
+
+type PostLocale struct {
+	Language string `json:"language"`
+	Location string `json:"location"`
+	// dark/light
+	Theme string `json:"theme"`
 }
 
 func (b *Base) GetAppViaToken(req *restful.Request, appService *app_service.Client) (string, []*app_service.AppInfo, error) {
@@ -106,4 +115,23 @@ func (b *Base) IsAdminUser(ctx context.Context) (bool, error) {
 		return false, errors.Errorf("invalid user %q, no owner role annotation", user.Name)
 	}
 	return role == constants.RolePlatformAdmin, nil
+}
+
+func (b *Base) HandleGetSysConfig(_ *restful.Request, resp *restful.Response) {
+	userOp, err := operator.NewUserOperator()
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("new user operator err, %v", err))
+		return
+	}
+	user, err := userOp.GetUser(constants.Username)
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("get user sys config err: get user err, %v", err))
+		return
+	}
+	cfg := PostLocale{
+		Language: user.Annotations[constants.UserLanguage],
+		Location: user.Annotations[constants.UserLocation],
+		Theme:    user.Annotations[constants.UserTheme],
+	}
+	response.Success(resp, &cfg)
 }

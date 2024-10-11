@@ -69,6 +69,12 @@ func AddContainer(c *restful.Container) error {
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Returns(http.StatusOK, "", response.Response{}))
 
+	ws.Route(ws.GET("/config-system").
+		To(handler.HandleGetSysConfig).
+		Doc("get user locale.").
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", response.Response{}))
+
 	c.Add(ws)
 
 	wsWizard := runtime.NewWebService(wizardModuleVersion)
