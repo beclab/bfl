@@ -1,9 +1,10 @@
 package v1alpha1
 
 import (
+	"fmt"
+
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
-	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -85,13 +86,6 @@ type LauncherAccessPolicy struct {
 type PublicDomainAccessPolicy struct {
 	DenyAll int `json:"deny_all"`
 	// AllowedDomains []string `json:"allowed_domains"`
-}
-
-type PostLocale struct {
-	Language string `json:"language"`
-	Location string `json:"location"`
-	// dark/light
-	Theme string `json:"theme"`
 }
 
 type EnableHTTPSRequest struct {
