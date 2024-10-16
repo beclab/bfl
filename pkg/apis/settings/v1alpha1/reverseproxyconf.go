@@ -170,6 +170,9 @@ func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context, con
 			return
 		}
 		err = errors.Wrap(configurator.configureDNS(publicIP, localIP, publicCName), "failed to configure DNS")
+		if err != nil {
+			return
+		}
 		err = errors.Wrap(conf.writeToReverseProxyConfigMap(ctx), "failed to write reverse proxy config data")
 	}()
 	localL4ProxyIP, err := k8sutil.GetL4ProxyNodeIP(ctx, 30*time.Second)
