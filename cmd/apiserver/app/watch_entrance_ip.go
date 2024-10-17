@@ -177,7 +177,7 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 				}).
 				SetBody(req).
 				SetResult(&v1alpha1.TunnelResponse{}).
-				Post("https://terminus-dnsop.snowinning.com/tunnel")
+				Post(constants.APIDNSSetCloudFlareTunnel)
 
 			if err != nil {
 				log.Error("request cloudflare tunnel api error, ", err)
