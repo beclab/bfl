@@ -284,7 +284,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 
 	o := settingsTask.EnableHTTPSTaskOption{
 		Name:                                terminusName,
-		GenerateURL:                         fmt.Sprintf(constants.NameBindAPICertGenerateFormat, terminusName),
+		GenerateURL:                         fmt.Sprintf(constants.APIFormatCertGenerateRequest, terminusName),
 		AccessToken:                         req.HeaderParameter(constants.AuthorizationTokenKey),
 		ReverseProxyAgentDeploymentName:     ReverseProxyAgentDeploymentName,
 		ReverseProxyAgentDeploymentReplicas: ReverseProxyAgentDeploymentReplicas,

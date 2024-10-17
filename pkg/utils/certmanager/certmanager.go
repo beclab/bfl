@@ -68,16 +68,16 @@ func NewCertManager(terminusName constants.TerminusName) Interface {
 	c.waitGenerateTimeout = 5 * time.Minute
 
 	// apis
-	c.apiGenerate = fmt.Sprintf(constants.NameBindAPICertGenerateFormat, terminusName)
-	c.apiGenerateStatus = fmt.Sprintf(constants.NameBandAPICertGenerateStatusFormat, terminusName)
-	c.apiDownloadCert = fmt.Sprintf(constants.NameBindAPICertDownloadFormat, terminusName)
+	c.apiGenerate = fmt.Sprintf(constants.APIFormatCertGenerateRequest, terminusName)
+	c.apiGenerateStatus = fmt.Sprintf(constants.APIFormatCertGenerateStatus, terminusName)
+	c.apiDownloadCert = fmt.Sprintf(constants.APIFormatCertDownload, terminusName)
 
-	c.apiAddDNSRecord = constants.DNSAPIAddDomainRecord
-	c.apiDeleteDNSRecord = fmt.Sprintf(constants.DNSAPIDeleteDomainRecordFormat, terminusName)
+	c.apiAddDNSRecord = constants.APIDNSAddRecord
+	c.apiDeleteDNSRecord = fmt.Sprintf(constants.APIFormatDNSDeleteRecord, terminusName)
 
-	c.apiSetCustomDomainOnCloudflare = constants.DNSAPIAddCustomDomainOnCloudflare
+	c.apiSetCustomDomainOnCloudflare = constants.APIDNSAddCustomDomain
 
-	c.apiCheckCustomDomainStatus = constants.DNSAPICheckCustomDomainCnameStatus
+	c.apiCheckCustomDomainStatus = constants.APIDNSCheckCustomDomainCname
 
 	return c
 }

@@ -2,6 +2,7 @@ package constants
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -76,29 +77,34 @@ var (
 )
 
 var (
-	NameBindAPIHost = "frp.snowinning.com"
+	apiPrefixCertService = "https://terminus-cert.snowinning.com"
 
-	nameBindAPIPrefix = "https://terminus-cert.snowinning.com"
+	apiPrefixDNSService = "https://terminus-dnsop.snowinning.com"
 
-	nameDNSAPIPrefix = "https://terminus-dnsop.snowinning.com"
+	APIFormatCertGenerateRequest string
 
-	NameBindAPICertGenerateFormat = nameBindAPIPrefix + "/generate?" + nameParamters
+	APIFormatCertGenerateStatus string
 
-	NameBandAPICertGenerateStatusFormat = nameBindAPIPrefix + "/status?" + nameParamters
+	APIFormatCertDownload string
 
-	NameBindAPICertDownloadFormat = nameBindAPIPrefix + "/download?" + nameParamters
+	APIDNSAddRecord string
 
-	DNSAPIAddDomainRecord = nameDNSAPIPrefix + "/adddnsrecord"
+	APIFormatDNSDeleteRecord string
 
-	DNSAPIDeleteDomainRecordFormat = nameDNSAPIPrefix + "/deldnsrecord?" + nameParamters
+	APIDNSAddCustomDomain string
 
-	DNSAPIAddCustomDomainOnCloudflare = nameDNSAPIPrefix + "/customhostname"
+	APIDNSCheckCustomDomainCname string
 
-	DNSAPICheckCustomDomainCnameStatus = nameDNSAPIPrefix + "/checkcname"
+	APIDNSSetCloudFlareTunnel string
 
 	NameSSLConfigMapName = "zone-ssl-config"
 
 	nameParamters = "name=%s"
+)
+
+const (
+	envTerminusCertServiceAPI = "TERMINUS_CERT_SERVICE_API"
+	envTerminusDNSServiceAPI  = "TERMINUS_DNS_SERVICE_API"
 )
 
 var (
@@ -281,3 +287,42 @@ const (
 	WaitResetPassword     WizardStatus = "wait_reset_password"
 	Completed             WizardStatus = "completed"
 )
+
+func addHTTPSSchemePrefixIfNecessary(original string) string {
+	if !strings.HasPrefix(original, "https://") {
+		return "https://" + original
+	}
+	return original
+}
+
+func setOverridesFromEnv() {
+	if envVar := os.Getenv(envTerminusCertServiceAPI); envVar != "" {
+		apiPrefixCertService = addHTTPSSchemePrefixIfNecessary(envVar)
+	}
+	if envVar := os.Getenv(envTerminusDNSServiceAPI); envVar != "" {
+		apiPrefixDNSService = addHTTPSSchemePrefixIfNecessary(envVar)
+	}
+}
+
+func initEnvDependantVars() {
+	APIFormatCertGenerateRequest = apiPrefixCertService + "/generate?" + nameParamters
+
+	APIFormatCertGenerateStatus = apiPrefixCertService + "/status?" + nameParamters
+
+	APIFormatCertDownload = apiPrefixCertService + "/download?" + nameParamters
+
+	APIDNSAddRecord = apiPrefixDNSService + "/adddnsrecord"
+
+	APIFormatDNSDeleteRecord = apiPrefixDNSService + "/deldnsrecord?" + nameParamters
+
+	APIDNSAddCustomDomain = apiPrefixDNSService + "/customhostname"
+
+	APIDNSCheckCustomDomainCname = apiPrefixDNSService + "/checkcname"
+
+	APIDNSSetCloudFlareTunnel = apiPrefixDNSService + "/tunnel"
+}
+
+func init() {
+	setOverridesFromEnv()
+	initEnvDependantVars()
+}

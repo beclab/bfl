@@ -224,7 +224,7 @@ func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context, con
 			}).
 			SetBody(req).
 			SetResult(&TunnelResponse{}).
-			Post("https://terminus-dnsop.snowinning.com/tunnel")
+			Post(constants.APIDNSSetCloudFlareTunnel)
 		if err != nil {
 			return errors.Wrap(err, "failed to request cloudflare tunnel api")
 		}
