@@ -1,6 +1,6 @@
 module bytetrade.io/web3os/bfl
 
-go 1.18
+go 1.22
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535
