@@ -32,6 +32,10 @@ type Entrance struct {
 	Invisible  bool   `json:"invisible,omitempty"`
 	AuthLevel  string `json:"authLevel"`
 	OpenMethod string `json:"openMethod"`
+
+	State   string `json:"state"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 type AppDeploymentInfo struct {

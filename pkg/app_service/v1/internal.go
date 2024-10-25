@@ -79,12 +79,25 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 			}
 		}
 
+		entranceStatusesMap := make(map[string]map[string]interface{})
 		status, ok := data["status"].(map[string]interface{})
 		if ok {
 			if t, ok := status["state"]; ok {
 				state = t.(string)
 			}
+			entranceStatuses, ok := status["entranceStatuses"].([]interface{})
+			if ok {
+				for _, es := range entranceStatuses {
+					if e, ok := es.(map[string]interface{}); ok {
+						entranceStatusesMap[e["name"].(string)] = e
+					}
+
+				}
+			} else {
+				klog.Infof("error: data[entranceStatues], %v", ok)
+			}
 		}
+		klog.Infof("entranceStatusesMap: %v", entranceStatusesMap)
 
 		entrances, ok := appSpec["entrances"]
 		if ok {
@@ -114,6 +127,15 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 				} else {
 					appEntrance.OpenMethod = "default"
 				}
+				if t, ok := entranceStatusesMap[appEntrance.Name]; ok {
+					entranceState := t["state"]
+					appEntrance.State = stringOrEmpty(entranceState)
+					appEntrance.Reason = stringOrEmpty(t["reason"])
+					appEntrance.Message = stringOrEmpty(t["message"])
+				} else {
+					appEntrance.State = state
+				}
+
 				appEntrances = append(appEntrances, appEntrance)
 			}
 		}
