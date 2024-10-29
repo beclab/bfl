@@ -484,6 +484,7 @@ type TemplateConfig struct {
 
 	Servers             []Server
 	CustomDomainServers []CustomServer
+	StreamServers       []StreamServer
 
 	PID        string
 	StatusPath string
@@ -517,6 +518,12 @@ type Server struct {
 	EnableOIDC            bool   `json:"enableOIDC"`
 	EnableWindowPushState bool   `json:"enableWindowPushState"`
 	Language              string `json:"language"`
+}
+
+type StreamServer struct {
+	Protocol  string `json:"protocol" yaml:"protocol"`
+	Port      int32  `json:"port" yaml:"port"`
+	ProxyPass string `json:"proxyPass" yaml:"proxyPass"`
 }
 
 type CustomServer struct {

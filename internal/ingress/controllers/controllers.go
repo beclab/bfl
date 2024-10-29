@@ -102,7 +102,12 @@ func (r *NginxController) render() error {
 		klog.Errorf("failed to generate custom domain server, %v", err)
 	}
 
-	content, err := r.generateTemplate(servers, customDomainServers)
+	streamServers, err := r.generateNginxStreamServers()
+	if err != nil {
+		klog.Errorf("failed to generate custom stream server %v", err)
+	}
+
+	content, err := r.generateTemplate(servers, customDomainServers, streamServers)
 	// klog.Infof("Generated nginx template file contents:\n%v", string(content))
 	if err != nil {
 		klog.Errorf("failed to generate nginx template file, %v", err)
@@ -379,6 +384,62 @@ func (r *NginxController) generateNginxServers() ([]config.Server, error) {
 	return servers, nil
 }
 
+func (r *NginxController) generateNginxStreamServers() ([]config.StreamServer, error) {
+	if r.apps == nil || len(r.apps) == 0 {
+		return nil, fmt.Errorf("current userspace has no applications")
+	}
+	streamServers := make([]config.StreamServer, 0)
+	var svc corev1.Service
+	err := r.Get(context.TODO(), types.NamespacedName{Namespace: constants.Namespace, Name: constants.BFLServiceName}, &svc)
+	if err != nil {
+		return nil, fmt.Errorf("no bfl service found %v", err)
+	}
+
+	n := len(svc.Spec.Ports)
+
+	for i := 0; i < n; {
+		if strings.HasPrefix(svc.Spec.Ports[i].Name, "tcp-") ||
+			strings.HasPrefix(svc.Spec.Ports[i].Name, "udp-") {
+			svc.Spec.Ports = append(svc.Spec.Ports[:i], svc.Spec.Ports[i+1:]...)
+			n--
+		} else {
+			i++
+		}
+	}
+	klog.Infof("before append ports: %v", svc.Spec.Ports)
+	// find TCP,UDP entrance
+	for _, app := range r.apps {
+		if len(app.Spec.Ports) == 0 {
+			continue
+		}
+		for _, p := range app.Spec.Ports {
+			if p.Host == "" {
+				continue
+			}
+
+			svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{
+				Name:       p.Protocol + "-" + strconv.Itoa(int(p.ExposePort)),
+				Protocol:   corev1.Protocol(strings.ToUpper(p.Protocol)),
+				Port:       p.ExposePort,
+				TargetPort: intstr.FromInt(int(p.ExposePort)),
+			})
+
+			server := config.StreamServer{
+				Protocol:  p.Protocol,
+				Port:      p.ExposePort,
+				ProxyPass: fmt.Sprintf("%s.%s.svc.cluster.local:%d", p.Host, app.Spec.Namespace, p.Port),
+			}
+			streamServers = append(streamServers, server)
+		}
+
+		err = r.Update(context.TODO(), &svc)
+		if err != nil {
+			klog.Errorf("update bfl service err=%v", err)
+			return streamServers, err
+		}
+	}
+	return streamServers, nil
+}
 func (r *NginxController) writeCertificates(certData, keyData string) error {
 	if !file.Exists(nginx.DefNgxSSLCertificationPath) {
 		err := os.MkdirAll(nginx.DefNgxSSLCertificationPath, 0755)
@@ -444,7 +505,7 @@ func (r *NginxController) getMasterNodesIps() ([]string, error) {
 	return addrs, nil
 }
 
-func (r *NginxController) generateTemplate(servers []config.Server, customDomainServers []config.CustomServer) ([]byte, error) {
+func (r *NginxController) generateTemplate(servers []config.Server, customDomainServers []config.CustomServer, streamServers []config.StreamServer) ([]byte, error) {
 	// new nginx configuration
 	cfg := config.NewDefault()
 	r.Cfg = cfg
@@ -479,6 +540,7 @@ func (r *NginxController) generateTemplate(servers []config.Server, customDomain
 		RealIpFrom:          masterNodeIPs,
 		Servers:             servers,
 		CustomDomainServers: customDomainServers,
+		StreamServers:       streamServers,
 
 		PID:                   nginx.PID,
 		StatusPath:            nginx.StatusPath,
