@@ -43,6 +43,8 @@ type ApplicationSpec struct {
 	// the service address of the application
 	Entrances []Entrance `json:"entrances,omitempty"`
 
+	Ports []ServicePort `json:"ports,omitempty"`
+
 	// the extend settings of the application
 	Settings map[string]string `json:"settings,omitempty"`
 }
@@ -56,6 +58,20 @@ type Entrance struct {
 	AuthLevel       string `yaml:"authLevel" json:"authLevel,omitempty"`
 	Invisible       bool   `yaml:"invisible,omitempty" json:"invisible,omitempty"`
 	WindowPushState bool   `yaml:"windowPushState,omitempty" json:"windowPushState,omitempty"`
+}
+
+type ServicePort struct {
+	Name string `json:"name" yaml:"name"`
+	Host string `yaml:"host" json:"host"`
+	Port int32  `yaml:"port" json:"port"`
+
+	ExposePort int32 `yaml:"exposePort" json:"exposePort,omitempty"`
+
+	// The protocol for this entrance. Supports "tcp" and "udp".
+	// Default is tcp.
+	// +default="udp"
+	// +optional
+	Protocol string `yaml:"protocol" json:"protocol,omitempty"`
 }
 
 // ApplicationStatus defines the observed state of Application

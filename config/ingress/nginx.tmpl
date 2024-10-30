@@ -492,3 +492,20 @@ http {
         }
     }
 }
+
+{{ if gt (len .StreamServers) 0 }}
+stream {
+    {{ range $server := .StreamServers }}
+    server {
+        {{ if eq $server.Protocol "udp" }}
+        listen {{ $server.Port }} udp;
+        {{ else }}
+        listen {{ $server.Port }};
+        {{ end }}
+        resolver coredns.kube-system.svc.cluster.local;
+        set $h {{ $server.ProxyPass }};
+        proxy_pass $h;
+    }
+    {{ end }}
+}
+{{ end }}
