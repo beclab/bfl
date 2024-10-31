@@ -158,7 +158,7 @@ func (h *Handler) handleVerifyUserPassword(req *restful.Request, resp *restful.R
 		return
 	}
 
-	log.Infow("verify user password", "userPassword", u)
+	log.Info("verify user password")
 
 	if u.UserName == "" {
 		u.UserName = constants.Username
