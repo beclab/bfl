@@ -712,7 +712,7 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		return
 	}
 
-	log.Infow("reset user password", "input", passwordReset)
+	log.Info("reset user password")
 
 	ctx, iamClient := req.Request.Context(), h.newIamClient(req)
 
