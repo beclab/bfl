@@ -9,9 +9,11 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"net/url"
 	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"strings"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -47,6 +49,14 @@ func flags() error {
 
 	if server == "" {
 		return fmt.Errorf("missing flag 'server'")
+	}
+
+	if strings.HasPrefix(server, "http") {
+		if serverURL, err := url.Parse(server); err != nil {
+			return fmt.Errorf("invalid server url: %v", err)
+		} else {
+			server = serverURL.Host
+		}
 	}
 
 	if username == "" {
