@@ -136,7 +136,7 @@ func (h *Handler) handleBindingUserZone(req *restful.Request, resp *restful.Resp
 
 	domain, err := op.GetDomain()
 	if err != nil {
-		response.HandleError(resp, errors.Errorf("user '%s' get terminus domain error, %v", user.Name, err))
+		response.HandleError(resp, errors.Errorf("user '%s' get olares domain error, %v", user.Name, err))
 		return
 	}
 
@@ -214,7 +214,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 			terminusName = userOp.GetTerminusName(user)
 
 			if terminusName == "" {
-				return errors.Errorf("no terminus name, please binding terminus name first")
+				return errors.Errorf("no olares name, please binding olares name first")
 			}
 
 			if userOp.AnnotationExists(user, constants.UserAnnotationZoneKey) {

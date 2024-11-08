@@ -47,7 +47,7 @@ func watch(ctx context.Context) (err error) {
 
 	terminusName = op.GetUserAnnotation(user, constants.UserAnnotationTerminusNameKey)
 	if terminusName == "" {
-		log.Warnf("user %q terminus name not binding yet", user.Name)
+		log.Warnf("user %q olares name not binding yet", user.Name)
 		return
 	}
 	zone = op.GetUserAnnotation(user, constants.UserAnnotationZoneKey)

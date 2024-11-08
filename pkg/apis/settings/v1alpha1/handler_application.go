@@ -119,6 +119,10 @@ func (h *Handler) setupAppCustomDomain(req *restful.Request, resp *restful.Respo
 	var reqCustomDomain = h.getCustomDomainValue(customDomain, constants.ApplicationThirdPartyDomain)
 
 	existsAppCustomDomain, err := h.getExistsCustomDomain(appServiceClient, appName, entranceName, token)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
 
 	cm := certmanager.NewCertManager(constants.TerminusName(terminusName))
 
@@ -386,6 +390,10 @@ func (h *Handler) getUserInfo() (string, string, error) {
 	var user *iamV1alpha2.User
 
 	op, err = operator.NewUserOperator()
+	if err != nil {
+		return "", "", fmt.Errorf("new user operator: %v", err)
+	}
+
 	user, err = op.GetUser(constants.Username)
 	if err != nil {
 		return "", "", fmt.Errorf("new user operator, and get user err: %v", err)
@@ -393,7 +401,7 @@ func (h *Handler) getUserInfo() (string, string, error) {
 
 	terminusName = op.GetTerminusName(user)
 	if terminusName == "" {
-		return "", "", fmt.Errorf("no terminus naame has binding")
+		return "", "", fmt.Errorf("no olares naame has binding")
 	}
 
 	zone = op.GetUserZone(user)

@@ -228,7 +228,7 @@ func (h *Handler) handleReDownloadCert(req *restful.Request, resp *restful.Respo
 		}
 		terminusName = op.GetTerminusName(user)
 		if terminusName == "" {
-			return errors.New("no terminus name has binding")
+			return errors.New("no olares name has binding")
 		}
 
 		client, err = runtime.NewKubeClientInCluster()
@@ -321,13 +321,13 @@ func (h *Handler) handleTerminusInfo(req *restful.Request, resp *restful.Respons
 
 	userOp, err := operator.NewUserOperator()
 	if err != nil {
-		response.HandleError(resp, errors.Errorf("terminus info: new user operator err: %v", err))
+		response.HandleError(resp, errors.Errorf("olares info: new user operator err: %v", err))
 		return
 	}
 
 	user, err := userOp.GetUser("")
 	if err != nil {
-		response.HandleError(resp, errors.Errorf("terminus info: get user err: %v", err))
+		response.HandleError(resp, errors.Errorf("olares info: get user err: %v", err))
 		return
 	}
 
@@ -343,7 +343,7 @@ func (h *Handler) handleTerminusInfo(req *restful.Request, resp *restful.Respons
 
 	selfhosted, terminusd, osVersion, err := userOp.SelfhostedAndOsVersion()
 	if err != nil {
-		response.HandleError(resp, errors.Errorf("terminus info: get terminus host type err: %v", err))
+		response.HandleError(resp, errors.Errorf("olares info: get olares host type err: %v", err))
 		return
 	}
 
@@ -357,7 +357,7 @@ func (h *Handler) handleTerminusInfo(req *restful.Request, resp *restful.Respons
 
 	terminusId, err := userOp.GetTerminusID()
 	if err != nil {
-		response.HandleError(resp, errors.Errorf("terminus info: get terminus id err: %v", err))
+		response.HandleError(resp, errors.Errorf("olares info: get olares id err: %v", err))
 		return
 	}
 

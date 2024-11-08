@@ -52,7 +52,7 @@ func (u *IamUser) GetTerminusName() (string, error) {
 	if name, ok := user.Annotations[constants.UserAnnotationTerminusNameKey]; ok && name != "" {
 		return name, nil
 	}
-	return "", fmt.Errorf("user terminus name not binding")
+	return "", fmt.Errorf("user olares name not binding")
 }
 
 func (u *IamUser) BindingTerminusName(terminusName string) error {
@@ -61,7 +61,7 @@ func (u *IamUser) BindingTerminusName(terminusName string) error {
 		return err
 	}
 	if v, ok := user.Annotations[constants.UserAnnotationTerminusNameKey]; ok {
-		return fmt.Errorf("user '%s' terminus name is already bind, terminus name: %s", user.Name, v)
+		return fmt.Errorf("user '%s' olares name is already bind, olares name: %s", user.Name, v)
 	}
 
 	// update terminus to user annotation

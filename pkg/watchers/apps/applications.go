@@ -296,7 +296,7 @@ func (s *Subscriber) getTerminusName() (string, error) {
 	}
 	terminusName := op.GetTerminusName(user)
 	if terminusName == "" {
-		return "", errors.New("terminus name not found")
+		return "", errors.New("olares name not found")
 	}
 	return terminusName, nil
 }

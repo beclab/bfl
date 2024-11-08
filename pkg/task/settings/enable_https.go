@@ -110,7 +110,7 @@ var _ task.LocalTaskInterface = &EnableHTTPSTask{}
 
 func NewEnableHTTPSTask(option *EnableHTTPSTaskOption) (*EnableHTTPSTask, error) {
 	if option.Name == "" {
-		return nil, fmt.Errorf("terminus name must be provided")
+		return nil, fmt.Errorf("olares name must be provided")
 	}
 
 	if option.WaitTimeout == nil {

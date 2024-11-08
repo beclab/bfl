@@ -1,19 +1,20 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"net/url"
+	"os"
+	"strings"
+
 	"bytetrade.io/web3os/bfl/internal/frpc/controllers"
 	"bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 	v1alpha2 "bytetrade.io/web3os/bfl/pkg/apis/settings/v1alpha1"
-	"flag"
-	"fmt"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"net/url"
-	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"strings"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -43,7 +44,7 @@ func flags() error {
 	flag.StringVar(&server, v1alpha2.FRPOptionServer, "", "The fprc server host")
 	flag.IntVar(&port, v1alpha2.FRPOptionPort, defaultPort, "The frp-server port")
 	flag.StringVar(&authMethod, v1alpha2.FRPOptionAuthMethod, "", "The frp auth method")
-	flag.StringVar(&username, v1alpha2.FRPOptionUserName, "", "The terminus user's username")
+	flag.StringVar(&username, v1alpha2.FRPOptionUserName, "", "The olares user's username")
 	flag.StringVar(&authToken, v1alpha2.FRPOptionAuthToken, "", "The token, if auth method is token")
 	flag.Parse()
 

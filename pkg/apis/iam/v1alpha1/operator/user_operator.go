@@ -115,7 +115,7 @@ func (o *UserOperator) GetUserDID(user *iamV1alpha2.User) string {
 
 func (o *UserOperator) BindingTerminusName(user *iamV1alpha2.User, domain string) error {
 	if v, ok := user.Annotations[constants.UserAnnotationTerminusNameKey]; ok {
-		return fmt.Errorf("user '%s' terminusName is already bind, terminusName: %s", user.Name, v)
+		return fmt.Errorf("user '%s' olaresName is already bind, olaresName: %s", user.Name, v)
 	}
 
 	// update terminus name to user annotation
@@ -236,7 +236,7 @@ func (o *UserOperator) GetDomain() (string, error) {
 	}
 
 	if name, ok := terminus.Spec.Settings[users.SettingsDomainNameKey]; !ok {
-		return "", errors.New("terminus domain name not found")
+		return "", errors.New("olares domain name not found")
 	} else {
 		return name, nil
 	}

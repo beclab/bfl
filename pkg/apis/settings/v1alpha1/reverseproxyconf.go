@@ -1,14 +1,19 @@
 package v1alpha1
 
 import (
+	"context"
+	"crypto/tls"
+	"fmt"
+	"net"
+	"net/http"
+	"strconv"
+	"time"
+
 	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
 	"bytetrade.io/web3os/bfl/pkg/utils/k8sutil"
-	"context"
-	"crypto/tls"
-	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
@@ -23,10 +28,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/pointer"
 	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
-	"net"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 type ReverseProxyConfigurator struct {
@@ -81,7 +82,7 @@ func NewReverseProxyConfigurator() (*ReverseProxyConfigurator, error) {
 	}
 	terminusName := userOp.GetTerminusName(user)
 	if terminusName == "" {
-		return nil, errors.New("terminus name of user is empty")
+		return nil, errors.New("olares name of user is empty")
 	}
 	restConfig, err := rest.InClusterConfig()
 	if err != nil {
