@@ -376,6 +376,16 @@ func (h *Handler) handleGetReverseProxyConfig(req *restful.Request, resp *restfu
 	response.Success(resp, conf)
 }
 
+func (h *Handler) handleGetDefaultReverseProxyConfig(req *restful.Request, resp *restful.Response) {
+	ctx := req.Request.Context()
+	conf, err := GetDefaultReverseProxyConfig(ctx)
+	if err != nil {
+		response.HandleError(resp, errors.Wrap(err, "failed to get the default reverse proxy config"))
+		return
+	}
+	response.Success(resp, conf)
+}
+
 func (h *Handler) handleGetEnableHTTPSTaskState(req *restful.Request, resp *restful.Response) {
 	name := req.Attribute(constants.UserContextAttribute).(string)
 	t, err := settingsTask.GetEnableHTTPSTaskState(name)
