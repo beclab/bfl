@@ -59,7 +59,7 @@ func AddContainer(c *restful.Container) error {
 
 	ws.Route(ws.POST("/reverse-proxy").
 		To(handler.handleChangeReverseProxyConfig).
-		Doc("Change reverse proxy settings.").
+		Doc("Change the current reverse proxy settings.").
 		Reads(ReverseProxyConfig{}).
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Metadata(restfulspec.KeyOpenAPITags, tags).
@@ -67,7 +67,14 @@ func AddContainer(c *restful.Container) error {
 
 	ws.Route(ws.GET("/reverse-proxy").
 		To(handler.handleGetReverseProxyConfig).
-		Doc("Get reverse proxy settings.").
+		Doc("Get the current reverse proxy settings.").
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", response.Response{}))
+
+	ws.Route(ws.GET("/default-reverse-proxy").
+		To(handler.handleGetDefaultReverseProxyConfig).
+		Doc("Get the default reverse proxy config, which will be applied at user activation, if reverse proxy is enabled.").
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{}))
