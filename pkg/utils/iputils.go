@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"bytetrade.io/web3os/bfl/internal/log"
@@ -42,6 +43,7 @@ func GetMyExternalIPAddr() string {
 		"httpbin":    "https://httpbin.org/ip",
 		"ifconfigme": "https://ifconfig.me/all.json",
 		"externalip": "https://myexternalip.com/json",
+		"joinolares": "https://myip.joinolares.cn/ip",
 	}
 
 	type httpBin struct {
@@ -85,6 +87,9 @@ func GetMyExternalIPAddr() string {
 			}
 			return ""
 		},
+		"joinolares": func(v []byte) string {
+			return strings.TrimSpace(string(v))
+		},
 	}
 
 	ch := make(chan any, len(sites))
@@ -112,6 +117,10 @@ func GetMyExternalIPAddr() string {
 	}
 
 	tr := time.NewTimer(time.Duration(5*len(sites)+3) * time.Second)
+	defer func() {
+		tr.Stop()
+		close(ch)
+	}()
 
 LOOP:
 	for i := 0; i < len(sites); i++ {
