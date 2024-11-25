@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"bytetrade.io/web3os/bfl/internal/log"
@@ -92,7 +93,15 @@ func GetMyExternalIPAddr() string {
 		},
 	}
 
+	var mu sync.Mutex
 	ch := make(chan any, len(sites))
+	chSyncOp := func(f func()) {
+		mu.Lock()
+		defer mu.Unlock()
+		if ch != nil {
+			f()
+		}
+	}
 
 	for site := range sites {
 		go func(name string) {
@@ -100,26 +109,30 @@ func GetMyExternalIPAddr() string {
 			c := http.Client{Timeout: 5 * time.Second}
 			resp, err := c.Get(sites[name])
 			if err != nil {
-				ch <- err
+				chSyncOp(func() { ch <- err })
 				return
 			}
 			defer resp.Body.Close()
 			respBytes, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				ch <- err
+				chSyncOp(func() { ch <- err })
 				return
 			}
 
 			ip := unmarshalFuncs[name](respBytes)
 			//println(name, site, ip)
-			ch <- ip
+			chSyncOp(func() { ch <- ip })
+
 		}(site)
 	}
 
 	tr := time.NewTimer(time.Duration(5*len(sites)+3) * time.Second)
 	defer func() {
 		tr.Stop()
-		close(ch)
+		chSyncOp(func() {
+			close(ch)
+			ch = nil
+		})
 	}()
 
 LOOP:
