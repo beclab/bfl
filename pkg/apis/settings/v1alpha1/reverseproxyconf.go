@@ -141,6 +141,10 @@ func (configurator *ReverseProxyConfigurator) configureDNS(publicIP, localIP, pu
 			return errors.Wrap(err, "failed to update PublicDomainIP annotation")
 		}
 	}
+	natGatewayIP := configurator.userOp.GetUserAnnotation(configurator.user, constants.UserAnnotationNatGatewayIp)
+	if natGatewayIP != "" {
+		localIP = natGatewayIP
+	}
 	if localIP != "" {
 		if err := configurator.cm.AddDNSRecord(nil, &localIP, nil); err != nil {
 			return errors.Wrap(err, "failed to configure DNS record for local IP")
