@@ -444,7 +444,7 @@ func NewDefault() Configuration {
 		WorkerShutdownTimeout:      "240s",
 		VariablesHashBucketSize:    256,
 		VariablesHashMaxSize:       2048,
-		UseHTTP2:                   false,
+		UseHTTP2:                   true,
 		BindAddressIpv4:            defBindAddress,
 		BindAddressIpv6:            defBindAddress,
 		DefaultType:                "text/html",

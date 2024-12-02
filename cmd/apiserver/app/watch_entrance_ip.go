@@ -149,10 +149,6 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 			u.Annotations[constants.UserAnnotationLocalDomainIp] = *newLocalIp
 		})
 
-		if err = op.UpdateUser(user, userPatches); err != nil {
-			return errors.WithStack(err)
-		}
-
 		log.Infof("resolved new local ip: %s", *newLocalIp)
 
 		if isCloudFlareTunnel {
@@ -201,6 +197,11 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 			if err != nil {
 				return err
 			}
+		}
+	}
+	if len(userPatches) > 0 {
+		if err = op.UpdateUser(user, userPatches); err != nil {
+			return errors.WithStack(err)
 		}
 	}
 
