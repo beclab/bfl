@@ -105,17 +105,15 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 		}
 		log.Debugf("got current public ip: %s", publicIp)
 
-		if publicIp == publicDomainIp {
-			log.Info("public ip no changed")
-			return nil
+		if publicIp != publicDomainIp {
+			if err = cm.AddDNSRecord(&publicIp, nil, nil); err != nil {
+				return errors.WithStack(err)
+			}
+			userPatches = append(userPatches, func(u *iamV1alpha2.User) {
+				u.Annotations[constants.UserAnnotationPublicDomainIp] = publicIp
+			})
+			log.Infof("resolved new public ip: %v", publicIp)
 		}
-		if err = cm.AddDNSRecord(&publicIp, nil, nil); err != nil {
-			return errors.WithStack(err)
-		}
-		userPatches = append(userPatches, func(u *iamV1alpha2.User) {
-			u.Annotations[constants.UserAnnotationPublicDomainIp] = publicIp
-		})
-		log.Infof("resolved new public ip: %v", publicIp)
 	}
 
 	// nat gateway ip
