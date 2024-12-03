@@ -133,13 +133,14 @@ func (configurator *ReverseProxyConfigurator) CheckConfig(conf *ReverseProxyConf
 // configureDNS configures DNS records
 // and also update the corresponding annotations on the user resource
 func (configurator *ReverseProxyConfigurator) configureDNS(publicIP, localIP, publicCName string) error {
+	var userPatches []func(*iamV1alpha2.User)
 	if publicIP != "" {
 		if err := configurator.cm.AddDNSRecord(&publicIP, nil, nil); err != nil {
 			return errors.Wrap(err, "failed to configure DNS record for public IP")
 		}
-		if err := configurator.userOp.UpdateAnnotation(configurator.user, constants.UserAnnotationPublicDomainIp, publicIP); err != nil {
-			return errors.Wrap(err, "failed to update PublicDomainIP annotation")
-		}
+		userPatches = append(userPatches, func(user *iamV1alpha2.User) {
+			user.Annotations[constants.UserAnnotationPublicDomainIp] = publicIP
+		})
 	}
 	natGatewayIP := configurator.userOp.GetUserAnnotation(configurator.user, constants.UserAnnotationNatGatewayIp)
 	if natGatewayIP != "" {
@@ -149,23 +150,26 @@ func (configurator *ReverseProxyConfigurator) configureDNS(publicIP, localIP, pu
 		if err := configurator.cm.AddDNSRecord(nil, &localIP, nil); err != nil {
 			return errors.Wrap(err, "failed to configure DNS record for local IP")
 		}
-		if err := configurator.userOp.UpdateAnnotation(configurator.user, constants.UserAnnotationLocalDomainIp, localIP); err != nil {
-			return errors.Wrap(err, "failed to update LocalDomainIP annotation")
-		}
+		userPatches = append(userPatches, func(user *iamV1alpha2.User) {
+			user.Annotations[constants.UserAnnotationLocalDomainIp] = localIP
+			user.Annotations[constants.UserAnnotationLocalDomainDNSRecord] = localIP
+		})
 	}
 	if publicCName != "" {
 		if err := configurator.cm.AddDNSRecord(nil, nil, &publicCName); err != nil {
 			return errors.Wrap(err, "failed to configure DNS record for public CName")
 		}
-		if err := configurator.userOp.UpdateAnnotation(configurator.user, constants.UserAnnotationPublicDomainIp, publicCName); err != nil {
-			return errors.Wrap(err, "failed to update PublicDomainIP annotation")
-		}
+		userPatches = append(userPatches, func(user *iamV1alpha2.User) {
+			user.Annotations[constants.UserAnnotationPublicDomainIp] = publicCName
+		})
 	}
 	// switched from public IP or FRP to cloudflare tunnel
 	if publicIP == "" && publicCName == "" {
-		return configurator.userOp.UpdateAnnotation(configurator.user, constants.UserAnnotationPublicDomainIp, "")
+		userPatches = append(userPatches, func(user *iamV1alpha2.User) {
+			user.Annotations[constants.UserAnnotationPublicDomainIp] = ""
+		})
 	}
-	return nil
+	return configurator.userOp.UpdateUser(configurator.user, userPatches)
 }
 
 func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context, conf *ReverseProxyConfig) (err error) {

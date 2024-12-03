@@ -178,6 +178,8 @@ var (
 
 	UserAnnotationNatGatewayIp = fmt.Sprintf("%s/nat-gateway-ip", AnnotationGroup)
 
+	UserAnnotationLocalDomainDNSRecord = fmt.Sprintf("%s/local-domain-dns-record", AnnotationGroup)
+
 	UserAnnotationReverseProxyType = fmt.Sprintf("%s/reverse-proxy-type", AnnotationGroup)
 	ReverseProxyTypeFRP            = "frp"
 	ReverseProxyTypeCloudflare     = "cloudflare"

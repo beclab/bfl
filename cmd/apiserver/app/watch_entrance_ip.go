@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -87,6 +86,7 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 	}
 
 	natGatewayIp = op.GetUserAnnotation(user, constants.UserAnnotationNatGatewayIp)
+	localDomainDNSRecord := op.GetUserAnnotation(user, constants.UserAnnotationLocalDomainDNSRecord)
 
 	cm := certmanager.NewCertManager(terminusName)
 
@@ -117,11 +117,14 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 	}
 
 	// nat gateway ip
-	if natGatewayIp != "" && !isCurrentLocalDomainName(zone, natGatewayIp) {
+	if natGatewayIp != "" && natGatewayIp != localDomainDNSRecord {
 		err := cm.AddDNSRecord(nil, &natGatewayIp, nil)
 		if err != nil {
 			return errors.WithStack(err)
 		}
+		userPatches = append(userPatches, func(u *iamV1alpha2.User) {
+			u.Annotations[constants.UserAnnotationLocalDomainDNSRecord] = natGatewayIp
+		})
 	}
 
 	// local ip
@@ -145,6 +148,7 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 		}
 		userPatches = append(userPatches, func(u *iamV1alpha2.User) {
 			u.Annotations[constants.UserAnnotationLocalDomainIp] = *newLocalIp
+			u.Annotations[constants.UserAnnotationLocalDomainDNSRecord] = *newLocalIp
 		})
 
 		log.Infof("resolved new local ip: %s", *newLocalIp)
@@ -204,22 +208,4 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 	}
 
 	return
-}
-
-func isCurrentLocalDomainName(terminusName, ip string) bool {
-	domain := "local." + terminusName
-
-	ips, err := net.LookupIP(domain)
-	if err != nil {
-		log.Errorf("lookup domain failed, %v, %v", err, domain)
-		return true
-	}
-
-	for _, i := range ips {
-		if i.To4().String() == ip {
-			return true
-		}
-	}
-
-	return false
 }
