@@ -3,6 +3,8 @@ package v1alpha1
 import (
 	"encoding/json"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net"
 	"reflect"
 	"strconv"
@@ -25,7 +27,6 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 )
@@ -277,7 +278,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		return
 	}
 
-	if err := reverseProxyConfigurator.CheckConfig(reverseProxyConf); err != nil {
+	if err = reverseProxyConfigurator.CheckConfig(reverseProxyConf); err != nil {
 		response.HandleError(resp, errors.Wrap(err, "invalid reverse proxy configuration"))
 		return
 	}
@@ -309,7 +310,8 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 
 		// create proxy deployment
 		proxyApply := NewL4ProxyDeploymentApplyConfiguration(namespace, serviceAccount, portInt)
-		createdProxy, err := k8sClient.AppsV1().Deployments(namespace).Apply(ctx,
+		var createdProxy *appsv1.Deployment
+		createdProxy, err = k8sClient.AppsV1().Deployments(namespace).Apply(ctx,
 			&proxyApply, metav1.ApplyOptions{Force: true, FieldManager: constants.ApplyPatchFieldManager})
 		if err != nil {
 			response.HandleError(resp, errors.Errorf("enable https: apply l4 proxy deployment err, %v", err))
@@ -319,7 +321,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 	}
 	o.L4ProxyNamespace = namespace
 
-	if err := reverseProxyConfigurator.Configure(ctx, reverseProxyConf); err != nil {
+	if err = reverseProxyConfigurator.Configure(ctx, reverseProxyConf); err != nil {
 		response.HandleError(resp, errors.Wrap(err, "failed to configure reverse proxy"))
 		return
 	}
