@@ -787,13 +787,14 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 				klog.Info("success to delete wizard")
 			}()
 
-			_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
-			if err != nil {
-				response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
-				return
-			}
-
 		}
+
+		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
+		if err != nil {
+			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
+			return
+		}
+
 	} else {
 		admin, err := iamClient.Users().Get(ctx, constants.Username, metav1.GetOptions{})
 		if err != nil {
