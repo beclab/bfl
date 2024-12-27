@@ -444,6 +444,28 @@ func AddContainer(c *restful.Container) error {
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Returns(http.StatusOK, "", &response.Response{}))
 
+	// headscale
+	ws.Route(ws.GET("/headscale/acl").
+		To(handler.handleGetHeadscaleSshAcl).
+		Doc("get headscale ssh acl").
+		Metadata(restfulspec.KeyOpenAPITags, []string{"headscale"}).
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Returns(http.StatusOK, "", &response.Response{}))
+
+	ws.Route(ws.POST("/headscale/enable/ssh").
+		To(handler.handleEnableHeadscaleSshAcl).
+		Doc("enable headscale ssh acl").
+		Metadata(restfulspec.KeyOpenAPITags, []string{"headscale"}).
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Returns(http.StatusOK, "", &response.Response{}))
+
+	ws.Route(ws.POST("/headscale/disable/ssh").
+		To(handler.handleDisableHeadscaleSshAcl).
+		Doc("disable headscale ssh acl").
+		Metadata(restfulspec.KeyOpenAPITags, []string{"headscale"}).
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Returns(http.StatusOK, "", &response.Response{}))
+
 	c.Add(ws)
 	return nil
 }
