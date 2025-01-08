@@ -29,7 +29,7 @@ type Entrance struct {
 	Title      string `json:"title"`
 	URL        string `json:"url"`
 	Icon       string `json:"icon"`
-	Invisible  bool   `json:"invisible,omitempty"`
+	Invisible  bool   `json:"invisible"`
 	AuthLevel  string `json:"authLevel"`
 	OpenMethod string `json:"openMethod"`
 
