@@ -445,7 +445,7 @@ func AddContainer(c *restful.Container) error {
 		Returns(http.StatusOK, "", &response.Response{}))
 
 	// headscale
-	ws.Route(ws.GET("/headscale/acl").
+	ws.Route(ws.GET("/headscale/ssh/acl").
 		To(handler.handleGetHeadscaleSshAcl).
 		Doc("get headscale ssh acl").
 		Metadata(restfulspec.KeyOpenAPITags, []string{"headscale"}).
@@ -462,6 +462,20 @@ func AddContainer(c *restful.Container) error {
 	ws.Route(ws.POST("/headscale/disable/ssh").
 		To(handler.handleDisableHeadscaleSshAcl).
 		Doc("disable headscale ssh acl").
+		Metadata(restfulspec.KeyOpenAPITags, []string{"headscale"}).
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Returns(http.StatusOK, "", &response.Response{}))
+
+	ws.Route(ws.GET("/headscale/{"+ParamAppName+"}/acl").
+		To(handler.handleGetHeadscaleAppAcl).
+		Doc("get app's headscale acl").
+		Metadata(restfulspec.KeyOpenAPITags, []string{"headscale"}).
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Returns(http.StatusOK, "", &response.Response{}))
+
+	ws.Route(ws.POST("/headscale/{"+ParamAppName+"}/acl").
+		To(handler.handleUpdateHeadscaleAppAcl).
+		Doc("set app's headscale acl").
 		Metadata(restfulspec.KeyOpenAPITags, []string{"headscale"}).
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Returns(http.StatusOK, "", &response.Response{}))

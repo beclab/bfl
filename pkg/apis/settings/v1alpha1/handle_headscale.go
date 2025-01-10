@@ -1,14 +1,16 @@
 package v1alpha1
 
 import (
-	"fmt"
+	"context"
+	"errors"
+	"slices"
+	"strings"
 
 	"bytetrade.io/web3os/bfl/pkg/api/response"
-	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
+	"bytetrade.io/web3os/bfl/pkg/client/dynamic_client"
+	"bytetrade.io/web3os/bfl/pkg/client/dynamic_client/apps"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"github.com/emicklei/go-restful/v3"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 
@@ -24,111 +26,144 @@ const (
 	ENV_HEADSCALE_ACL_SSH = "HEADSCALE_ACL_SSH"
 )
 
-type Acl struct {
+type SshAcl struct {
 	AllowSSH bool     `json:"allow_ssh"`
 	State    AclState `json:"state"`
 }
 
+type Acl struct {
+	Proto string   `json:"proto"`
+	Dst   []string `json:"Dst"`
+}
+
+// settings' acl
+
 func (h *Handler) handleGetHeadscaleSshAcl(req *restful.Request, resp *restful.Response) {
-
-	k8sClient := runtime.NewKubeClient(req)
-
-	// get headscale pods, check if headscale is running, if not, return "acl applying"
-	// and if headscale is running, check if the acl env from headscale deployment, then return the acl
-	namespace := fmt.Sprintf("user-space-%s", constants.Username)
-	pods, err := k8sClient.Kubernetes().CoreV1().Pods(namespace).
-		List(req.Request.Context(), metav1.ListOptions{LabelSelector: "app=headscale"})
+	app, err := h.findApp(req.Request.Context(), "settings")
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			response.Success(resp, Acl{State: AclStateApplying})
-			return
-		}
-
-		klog.Error("Failed to get headscale pods: ", err)
-		response.HandleError(resp, err)
-		return
-	}
-
-	if len(pods.Items) == 0 {
-		response.Success(resp, Acl{State: AclStateApplying})
-		return
-	}
-
-	if pods.Items[0].Status.Phase != "Running" {
-		response.Success(resp, Acl{State: AclStateApplying})
-		return
-	}
-
-	// get headscale deployment
-	deploy, err := k8sClient.Kubernetes().AppsV1().Deployments(namespace).
-		Get(req.Request.Context(), "headscale", metav1.GetOptions{})
-
-	if err != nil {
-		klog.Error("Failed to get headscale deployment: ", err)
 		response.HandleError(resp, err)
 		return
 	}
 
 	// get headscale acl env
 	allowSSH := false
-	for _, env := range deploy.Spec.Template.Spec.Containers[0].Env {
-		if env.Name == ENV_HEADSCALE_ACL_SSH {
-			allowSSH = env.Value == "true"
+	for _, acl := range app.Spec.TailScaleACLs {
+		if slices.Contains(acl.Dst, "*:22") && strings.ToLower(acl.Proto) == "tcp" {
+			allowSSH = true
 			break
 		}
 	}
 
-	response.Success(resp, Acl{AllowSSH: allowSSH, State: AclStateApplied})
+	response.Success(resp, SshAcl{AllowSSH: allowSSH, State: AclStateApplied})
 }
 
 func (h *Handler) handleDisableHeadscaleSshAcl(req *restful.Request, resp *restful.Response) {
-	h.setHeadscaleSshAcl(req, resp, "false")
+	h.setHeadscaleAcl(req, resp, "settings", nil)
 }
 
 func (h *Handler) handleEnableHeadscaleSshAcl(req *restful.Request, resp *restful.Response) {
-	h.setHeadscaleSshAcl(req, resp, "true")
+	h.setHeadscaleAcl(req, resp, "settings", []apps.ACL{
+		{Proto: "tcp", Dst: []string{"*:22"}},
+	})
 }
 
-func (h *Handler) setHeadscaleSshAcl(req *restful.Request, resp *restful.Response, value string) {
-	k8sClient := runtime.NewKubeClient(req)
-	namespace := fmt.Sprintf("user-space-%s", constants.Username)
+// app's acl
 
-	// get headscale deployment
-	deploy, err := k8sClient.Kubernetes().AppsV1().Deployments(namespace).
-		Get(req.Request.Context(), "headscale", metav1.GetOptions{})
+func (h *Handler) handleGetHeadscaleAppAcl(req *restful.Request, resp *restful.Response) {
+	appName := req.PathParameter(ParamAppName)
 
+	app, err := h.findApp(req.Request.Context(), appName)
 	if err != nil {
-		klog.Error("Failed to get headscale deployment: ", err)
 		response.HandleError(resp, err)
 		return
 	}
 
-	// update headscale deployment
-	found := false
-	for i, env := range deploy.Spec.Template.Spec.Containers[0].Env {
-		if env.Name == ENV_HEADSCALE_ACL_SSH {
-			deploy.Spec.Template.Spec.Containers[0].Env[i].Value = value
-			found = true
-			break
-		}
+	var acls []Acl
+	for _, acl := range app.Spec.TailScaleACLs {
+		acls = append(acls, Acl{
+			Proto: acl.Proto,
+			Dst:   acl.Dst,
+		})
 	}
 
-	if !found {
-		deploy.Spec.Template.Spec.Containers[0].Env = append(deploy.Spec.Template.Spec.Containers[0].Env,
-			corev1.EnvVar{Name: ENV_HEADSCALE_ACL_SSH, Value: value})
+	response.Success(resp, acls)
+}
+
+func (h *Handler) handleUpdateHeadscaleAppAcl(req *restful.Request, resp *restful.Response) {
+	appName := req.PathParameter(ParamAppName)
+	acls, err := h.parseAcl(req)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
+	h.setHeadscaleAcl(req, resp, appName, acls)
+}
+
+func (h *Handler) setHeadscaleAcl(req *restful.Request, resp *restful.Response, appName string, acls []apps.ACL) {
+
+	app, err := h.findApp(req.Request.Context(), appName)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
 	}
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		_, err = k8sClient.Kubernetes().AppsV1().Deployments(namespace).
-			Update(req.Request.Context(), deploy, metav1.UpdateOptions{})
-		return err
+		app.Spec.TailScaleACLs = acls
+		return nil
 	})
 
 	if err != nil {
-		klog.Error("Failed to update headscale deployment: ", err)
+		klog.Error("Failed to update headscale acl: ", err)
 		response.HandleError(resp, err)
 		return
 	}
 
 	response.SuccessNoData(resp)
+}
+
+func (h *Handler) findApp(ctx context.Context, appName string) (*apps.Application, error) {
+	client, err := dynamic_client.NewResourceClient[apps.Application, apps.ApplicationList](apps.ApplicationGvr)
+	if err != nil {
+		klog.Error("failed to get client: ", err)
+		return nil, err
+	}
+
+	apps, err := client.List(ctx, metav1.ListOptions{})
+	if err != nil {
+		klog.Error("list app error: ", err)
+		return nil, err
+	}
+
+	for _, a := range apps {
+		if a.Spec.Name == appName && a.Spec.Owner == constants.Username {
+			return &a, nil
+		}
+	}
+
+	return nil, errors.New("app not found")
+}
+
+func (h *Handler) parseAcl(req *restful.Request) ([]apps.ACL, error) {
+	var acls []apps.ACL
+	err := req.ReadEntity(&acls)
+	if err != nil {
+		klog.Error("parse request acl body error, ", err)
+		return nil, err
+	}
+
+	for _, a := range acls {
+		acls = append(acls, apps.ACL{
+			Proto: a.Proto,
+			Dst:   a.Dst,
+		})
+	}
+
+	err = apps.CheckTailScaleACLs(acls)
+	if err != nil {
+		klog.Error("check acl error, ", err)
+		return nil, err
+	}
+
+	return acls, nil
 }
