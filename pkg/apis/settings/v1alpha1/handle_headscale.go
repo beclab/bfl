@@ -3,13 +3,13 @@ package v1alpha1
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 
 	"bytetrade.io/web3os/bfl/pkg/api/response"
 	"bytetrade.io/web3os/bfl/pkg/client/dynamic_client"
 	"bytetrade.io/web3os/bfl/pkg/client/dynamic_client/apps"
 	"bytetrade.io/web3os/bfl/pkg/constants"
+	"bytetrade.io/web3os/bfl/pkg/utils"
 	"github.com/emicklei/go-restful/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -48,7 +48,7 @@ func (h *Handler) handleGetHeadscaleSshAcl(req *restful.Request, resp *restful.R
 	// get headscale acl env
 	allowSSH := false
 	for _, acl := range app.Spec.TailScaleACLs {
-		if slices.Contains(acl.Dst, "*:22") && strings.ToLower(acl.Proto) == "tcp" {
+		if utils.ListContains(acl.Dst, "*:22") && strings.ToLower(acl.Proto) == "tcp" {
 			allowSSH = true
 			break
 		}
