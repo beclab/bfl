@@ -109,8 +109,23 @@ func (h *Handler) setHeadscaleAcl(req *restful.Request, resp *restful.Response, 
 	}
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		app.Spec.TailScaleACLs = acls
-		return nil
+
+		client, err := dynamic_client.NewResourceClient[apps.Application, apps.ApplicationList](apps.ApplicationGvr)
+		if err != nil {
+			klog.Error("failed to get client: ", err)
+			return err
+		}
+
+		updateApp, err := client.Get(req.Request.Context(), app.Name, metav1.GetOptions{})
+		if err != nil {
+			klog.Error("failed to get app: ", err, ", ", app.Name)
+			return err
+		}
+
+		updateApp.Spec.TailScaleACLs = acls
+		_, err = client.Update(req.Request.Context(), updateApp, metav1.UpdateOptions{})
+
+		return err
 	})
 
 	if err != nil {
