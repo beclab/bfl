@@ -7,20 +7,22 @@ import (
 )
 
 type AppInfo struct {
-	ID              string     `json:"id"`
-	Name            string     `json:"name"`
-	Namespace       string     `json:"namespace"`
-	DeploymentName  string     `json:"deployment"`
-	Owner           string     `json:"owner"`
-	URL             string     `json:"url"`
-	Icon            string     `json:"icon"`
-	Title           string     `json:"title"`
-	Target          string     `json:"target"`
-	Entrances       []Entrance `json:"entrances"`
-	State           string     `json:"state"`
-	IsSysApp        bool       `json:"isSysApp"`
-	IsClusterScoped bool       `json:"isClusterScoped"`
-	MobileSupported bool       `json:"mobileSupported"`
+	ID              string        `json:"id"`
+	Name            string        `json:"name"`
+	Namespace       string        `json:"namespace"`
+	DeploymentName  string        `json:"deployment"`
+	Owner           string        `json:"owner"`
+	URL             string        `json:"url"`
+	Icon            string        `json:"icon"`
+	Title           string        `json:"title"`
+	Target          string        `json:"target"`
+	Entrances       []Entrance    `json:"entrances"`
+	Ports           []ServicePort `json:"ports"`
+	TailScaleACLs   []ACL         `json:"tailscaleAcls,omitempty"`
+	State           string        `json:"state"`
+	IsSysApp        bool          `json:"isSysApp"`
+	IsClusterScoped bool          `json:"isClusterScoped"`
+	MobileSupported bool          `json:"mobileSupported"`
 }
 
 type Entrance struct {
@@ -36,6 +38,25 @@ type Entrance struct {
 	State   string `json:"state"`
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message,omitempty"`
+}
+type ServicePort struct {
+	Name string `json:"name"`
+	Host string `json:"host"`
+	Port int32  `json:"port"`
+
+	ExposePort int32 `json:"exposePort,omitempty"`
+
+	// The protocol for this entrance. Supports "tcp" and "udp".
+	// Default is tcp.
+	// +default="tcp"
+	// +optional
+	Protocol string `json:"protocol,omitempty"`
+}
+type ACL struct {
+	Action string   `json:"action,omitempty"`
+	Src    []string `json:"src,omitempty"`
+	Proto  string   `json:"proto"`
+	Dst    []string `json:"dst"`
 }
 
 type AppDeploymentInfo struct {
