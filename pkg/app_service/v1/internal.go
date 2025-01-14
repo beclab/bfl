@@ -44,6 +44,9 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 	var res []*AppInfo
 	for _, data := range apps {
 		var appEntrances []Entrance
+		appPorts := make([]ServicePort, 0)
+		appACLs := make([]ACL, 0)
+
 		appSpec, ok := data["spec"].(map[string]interface{})
 		if !ok {
 			klog.Error("get app info error: ", data)
@@ -140,6 +143,62 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 			}
 		}
 
+		ports, ok := appSpec["ports"]
+		if ok {
+			portsInterface := ports.([]interface{})
+			for _, p := range portsInterface {
+				portsMap := p.(map[string]interface{})
+				var appPort ServicePort
+				if t, ok := portsMap["exposePort"]; ok {
+					appPort.ExposePort = int32(t.(float64))
+				}
+				if t, ok := portsMap["host"]; ok {
+					appPort.Host = stringOrEmpty(t)
+				}
+				if t, ok := portsMap["name"]; ok {
+					appPort.Name = stringOrEmpty(t)
+				}
+				if t, ok := portsMap["port"]; ok {
+					appPort.Port = int32(t.(float64))
+				}
+				if t, ok := portsMap["protocol"]; ok {
+					appPort.Protocol = stringOrEmpty(t)
+				}
+				appPorts = append(appPorts, appPort)
+			}
+		}
+		acls, ok := appSpec["tailscaleAcls"]
+		if ok {
+			aclInterface := acls.([]interface{})
+			for _, a := range aclInterface {
+				aclMap := a.(map[string]interface{})
+				var tailscaleACL ACL
+				if t, ok := aclMap["action"]; ok {
+					tailscaleACL.Action = stringOrEmpty(t)
+				}
+				if t, ok := aclMap["src"]; ok {
+					srcInterface := t.([]interface{})
+					src := make([]string, 0)
+					for _, s := range srcInterface {
+						src = append(src, s.(string))
+					}
+					tailscaleACL.Src = src
+				}
+				if t, ok := aclMap["proto"]; ok {
+					tailscaleACL.Proto = stringOrEmpty(t)
+				}
+				if t, ok := aclMap["dst"]; ok {
+					dstInterface := t.([]interface{})
+					dst := make([]string, 0)
+					for _, d := range dstInterface {
+						dst = append(dst, d.(string))
+					}
+					tailscaleACL.Dst = dst
+				}
+				appACLs = append(appACLs, tailscaleACL)
+			}
+		}
+
 		res = append(res, &AppInfo{
 			ID:              genAppID(appSpec),
 			Name:            stringOrEmpty(appSpec["name"]),
@@ -150,6 +209,8 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 			Title:           title,
 			Target:          target,
 			Entrances:       appEntrances,
+			Ports:           appPorts,
+			TailScaleACLs:   appACLs,
 			State:           state,
 			IsSysApp:        isSysApp,
 			IsClusterScoped: isClusterScoped,
