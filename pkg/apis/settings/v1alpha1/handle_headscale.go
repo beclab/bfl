@@ -33,7 +33,7 @@ type SshAcl struct {
 
 type Acl struct {
 	Proto string   `json:"proto"`
-	Dst   []string `json:"Dst"`
+	Dst   []string `json:"dst"`
 }
 
 // settings' acl
