@@ -471,6 +471,7 @@ func AddContainer(c *restful.Container) error {
 		Doc("get app's headscale acl").
 		Metadata(restfulspec.KeyOpenAPITags, []string{"headscale"}).
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Param(ws.PathParameter(ParamAppName, "app name").DataType("string").Required(true)).
 		Returns(http.StatusOK, "", &response.Response{}))
 
 	ws.Route(ws.POST("/headscale/{"+ParamAppName+"}/acl").
@@ -478,6 +479,7 @@ func AddContainer(c *restful.Container) error {
 		Doc("set app's headscale acl").
 		Metadata(restfulspec.KeyOpenAPITags, []string{"headscale"}).
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Param(ws.PathParameter(ParamAppName, "app name").DataType("string").Required(true)).
 		Returns(http.StatusOK, "", &response.Response{}))
 
 	c.Add(ws)
