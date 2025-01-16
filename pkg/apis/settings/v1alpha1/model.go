@@ -152,6 +152,10 @@ func NewL4ProxyDeploymentApplyConfiguration(namespace, serviceAccountName string
 					HostNetwork:        pointer.Bool(true),
 					DNSPolicy:          &dnsPolicy,
 					ServiceAccountName: pointer.String(serviceAccountName),
+					PriorityClassName: func() *string {
+						name := "system-cluster-critical"
+						return &name
+					}(),
 					Affinity: &applyCorev1.AffinityApplyConfiguration{
 						NodeAffinity: &applyCorev1.NodeAffinityApplyConfiguration{
 							PreferredDuringSchedulingIgnoredDuringExecution: []applyCorev1.PreferredSchedulingTermApplyConfiguration{
