@@ -72,7 +72,7 @@ const (
 
 	proxyConnectTimeout = "30s"
 
-	proxyReadTimeout = "300s"
+	proxyReadTimeout = "600s"
 
 	proxySendTimeout = "60s"
 )
