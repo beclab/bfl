@@ -2,16 +2,20 @@ package v1alpha1
 
 import (
 	"fmt"
+	"runtime"
+	"strconv"
 
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	applyAppsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	applyCorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	applyMetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 )
 
@@ -119,6 +123,12 @@ func NewL4ProxyDeploymentApplyConfiguration(namespace, serviceAccountName string
 	imageVersion := utils.EnvOrDefault("L4_PROXY_IMAGE_VERSION", "v0.2.0")
 	imageName := fmt.Sprintf("%s:%s", utils.EnvOrDefault("L4_PROXY_IMAGE_NAME", constants.L4ProxyImage), imageVersion)
 
+	workerProcessesNum := strconv.Itoa(runtime.NumCPU() / 2)
+	if workerProcessesNum == "" || workerProcessesNum == "0" {
+		klog.Warning("get cpu num error")
+		workerProcessesNum = "4"
+	}
+
 	return applyAppsv1.DeploymentApplyConfiguration{
 		TypeMetaApplyConfiguration: applyMetav1.TypeMetaApplyConfiguration{
 			Kind:       pointer.String("Deployment"),
@@ -186,7 +196,7 @@ func NewL4ProxyDeploymentApplyConfiguration(namespace, serviceAccountName string
 							Command: []string{
 								"/l4-bfl-proxy",
 								"-w",
-								"4",
+								workerProcessesNum,
 							},
 							Env: []applyCorev1.EnvVarApplyConfiguration{
 								{
@@ -223,6 +233,14 @@ func NewL4ProxyDeploymentApplyConfiguration(namespace, serviceAccountName string
 								{
 									ContainerPort: pointer.Int32(int32(port)),
 									Protocol:      &protocolTCP,
+								},
+							},
+							Resources: &applyCorev1.ResourceRequirementsApplyConfiguration{
+								Limits: &corev1.ResourceList{
+									corev1.ResourceCPU: resource.MustParse("2"),
+								},
+								Requests: &corev1.ResourceList{
+									corev1.ResourceCPU: resource.MustParse("100m"),
 								},
 							},
 						},
