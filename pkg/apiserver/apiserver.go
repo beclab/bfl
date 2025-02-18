@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	urlruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"kubesphere.io/kubesphere/pkg/apiserver/config"
 )
 
 type APIServer struct {
@@ -74,17 +73,12 @@ func New() (*APIServer, error) {
 }
 
 func (s *APIServer) initFetchKsJwtKey() error {
-	ksConfig, err := s.kubeClient.Kubernetes().CoreV1().ConfigMaps(constants.KubeSphereNamespace).
-		Get(context.Background(), constants.KubeSphereConfigName, metav1.GetOptions{})
+	secret, err := s.kubeClient.Kubernetes().CoreV1().Secrets("os-system").Get(context.TODO(), "lldap-credentials", metav1.GetOptions{})
 	if err != nil {
-		return errors.Errorf("get ks config err: %v", err)
+		return err
 	}
-
-	c, err := config.GetFromConfigMap(ksConfig)
-	if err != nil {
-		return errors.Errorf("parse and unmarshal ks config err: %v", err)
-	}
-	constants.KubeSphereJwtKey = []byte(c.AuthenticationOptions.JwtSecret)
+	jwtSecretKey := secret.Data["lldap-jwt-secret"]
+	constants.KubeSphereJwtKey = jwtSecretKey
 	return nil
 }
 

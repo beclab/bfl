@@ -173,37 +173,37 @@ func AddContainer(c *restful.Container) error {
 
 	// notification api
 
-	ws.Route(ws.GET("/notification/config").
-		To(handler.getNotificationConfig).
-		Doc("Get user's notification configs.").
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Param(ws.QueryParameter("type", "config or receiver type, known values include dingtalk, email, slack, webhook, wechat").Required(true)).
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Returns(http.StatusOK, "", response.Response{}))
-
-	ws.Route(ws.POST("/notification/config").
-		To(handler.applyNotificationConfig).
-		Doc("Create or update user's notification config.").
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Reads(NotificationSetting{}).
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Returns(http.StatusOK, "", response.Response{}))
-
-	ws.Route(ws.DELETE("/notification/config").
-		To(handler.deleteNotificationConfig).
-		Doc("Delete user's notification config.").
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Param(ws.QueryParameter("type", "config or receiver type, known values include dingtalk, email, slack, webhook, wechat").Required(true)).
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Returns(http.StatusOK, "", response.Response{}))
-
-	ws.Route(ws.POST("/notification/config/verify").
-		To(handler.verifyNotificationConfig).
-		Doc("Verify user's notification config.").
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Reads(NotificationSetting{}).
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Returns(http.StatusOK, "", response.Response{}))
+	//ws.Route(ws.GET("/notification/config").
+	//	To(handler.getNotificationConfig).
+	//	Doc("Get user's notification configs.").
+	//	Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+	//	Param(ws.QueryParameter("type", "config or receiver type, known values include dingtalk, email, slack, webhook, wechat").Required(true)).
+	//	Metadata(restfulspec.KeyOpenAPITags, tags).
+	//	Returns(http.StatusOK, "", response.Response{}))
+	//
+	//ws.Route(ws.POST("/notification/config").
+	//	To(handler.applyNotificationConfig).
+	//	Doc("Create or update user's notification config.").
+	//	Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+	//	Reads(NotificationSetting{}).
+	//	Metadata(restfulspec.KeyOpenAPITags, tags).
+	//	Returns(http.StatusOK, "", response.Response{}))
+	//
+	//ws.Route(ws.DELETE("/notification/config").
+	//	To(handler.deleteNotificationConfig).
+	//	Doc("Delete user's notification config.").
+	//	Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+	//	Param(ws.QueryParameter("type", "config or receiver type, known values include dingtalk, email, slack, webhook, wechat").Required(true)).
+	//	Metadata(restfulspec.KeyOpenAPITags, tags).
+	//	Returns(http.StatusOK, "", response.Response{}))
+	//
+	//ws.Route(ws.POST("/notification/config/verify").
+	//	To(handler.verifyNotificationConfig).
+	//	Doc("Verify user's notification config.").
+	//	Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+	//	Reads(NotificationSetting{}).
+	//	Metadata(restfulspec.KeyOpenAPITags, tags).
+	//	Returns(http.StatusOK, "", response.Response{}))
 
 	// app settings
 	ws.Route(ws.POST("/applications/{"+ParamAppName+"}/setup/policy").

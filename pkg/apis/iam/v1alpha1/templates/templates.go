@@ -45,13 +45,19 @@ func NewUserAndGlobalRoleBinding(u *UserCreateOption) (string, *iamV1alpha2.User
 				constants.UserLauncherAccessLevel:       "1",
 				constants.UserAnnotationLimitsMemoryKey: u.MemoryLimit,
 				constants.UserAnnotationLimitsCpuKey:    u.CpuLimit,
+				"iam.kubesphere.io/sync-to-lldap":       "true",
+				"iam.kubesphere.io/synced-to-lldap":     "false",
 			},
 		},
 		Spec: iamV1alpha2.UserSpec{
-			DisplayName:       u.DisplayName,
-			Email:             u.Email,
-			EncryptedPassword: u.Password,
-			Description:       u.Description,
+			DisplayName: u.DisplayName,
+			Email:       u.Email,
+			//EncryptedPassword: u.Password,
+			InitialPassword: u.Password,
+			Description:     u.Description,
+		},
+		Status: iamV1alpha2.UserStatus{
+			State: iamV1alpha2.UserActive,
 		},
 	}
 
@@ -81,35 +87,35 @@ func NewUserAndGlobalRoleBinding(u *UserCreateOption) (string, *iamV1alpha2.User
 
 }
 
-func NewWorkspaceRoleBinding(u *UserCreateOption, workspace, workspaceRole string) (string, *iamV1alpha2.WorkspaceRoleBinding) {
-	name := u.Name
-
-	return name, &iamV1alpha2.WorkspaceRoleBinding{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: iamV1alpha2.SchemeGroupVersion.String(),
-			Kind:       iamV1alpha2.ResourceKindWorkspaceRoleBinding,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"iam.kubesphere.io/user-ref": name,
-				"kubesphere.io/workspace":    workspace,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: iamV1alpha2.SchemeGroupVersion.String(),
-			Kind:     iamV1alpha2.ResourceKindWorkspaceRole,
-			Name:     workspaceRole,
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				APIGroup: iamV1alpha2.SchemeGroupVersion.String(),
-				Kind:     iamV1alpha2.ResourceKindUser,
-				Name:     name,
-			},
-		},
-	}
-}
+//func NewWorkspaceRoleBinding(u *UserCreateOption, workspace, workspaceRole string) (string, *iamV1alpha2.WorkspaceRoleBinding) {
+//	name := u.Name
+//
+//	return name, &iamV1alpha2.WorkspaceRoleBinding{
+//		TypeMeta: metav1.TypeMeta{
+//			APIVersion: iamV1alpha2.SchemeGroupVersion.String(),
+//			Kind:       iamV1alpha2.ResourceKindWorkspaceRoleBinding,
+//		},
+//		ObjectMeta: metav1.ObjectMeta{
+//			Name: name,
+//			Labels: map[string]string{
+//				"iam.kubesphere.io/user-ref": name,
+//				"kubesphere.io/workspace":    workspace,
+//			},
+//		},
+//		RoleRef: rbacv1.RoleRef{
+//			APIGroup: iamV1alpha2.SchemeGroupVersion.String(),
+//			Kind:     iamV1alpha2.ResourceKindWorkspaceRole,
+//			Name:     workspaceRole,
+//		},
+//		Subjects: []rbacv1.Subject{
+//			{
+//				APIGroup: iamV1alpha2.SchemeGroupVersion.String(),
+//				Kind:     iamV1alpha2.ResourceKindUser,
+//				Name:     name,
+//			},
+//		},
+//	}
+//}
 
 type Userspace = corev1.Namespace
 

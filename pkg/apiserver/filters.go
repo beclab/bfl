@@ -10,7 +10,6 @@ import (
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/api/response"
 	apiRuntime "bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
-	"bytetrade.io/web3os/bfl/pkg/client/cache"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 
@@ -88,16 +87,16 @@ func authenticate(req *restful.Request, resp *restful.Response, chain *restful.F
 		}
 
 		// check token is exists
-		if cache.RedisClient != nil {
-			pattern := fmt.Sprintf("kubesphere:user:*:token:%s", tokenStr)
-			keys, err := cache.RedisClient.Keys(pattern)
-			if err == nil && len(keys) == 0 {
-				response.HandleError(resp, response.NewTokenValidationError("token not be found in cache"))
-				return
-			} else if err != nil {
-				log.Errorf("keys %q, err: %v", pattern, err)
-			}
-		}
+		//if cache.RedisClient != nil {
+		//	pattern := fmt.Sprintf("kubesphere:user:*:token:%s", tokenStr)
+		//	keys, err := cache.RedisClient.Keys(pattern)
+		//	if err == nil && len(keys) == 0 {
+		//		response.HandleError(resp, response.NewTokenValidationError("token not be found in cache"))
+		//		return
+		//	} else if err != nil {
+		//		log.Errorf("keys %q, err: %v", pattern, err)
+		//	}
+		//}
 
 		req.SetAttribute(constants.UserContextAttribute, claims.Username)
 	}
