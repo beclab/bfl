@@ -19,17 +19,18 @@ import (
 	v1alpha1client "bytetrade.io/web3os/bfl/pkg/client/clientset/v1alpha1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/event/v1"
+	"bytetrade.io/web3os/bfl/pkg/lldap"
 	"bytetrade.io/web3os/bfl/pkg/task"
 	"bytetrade.io/web3os/bfl/pkg/task/settings"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/httpclient"
+	"github.com/beclab/lldap-client/pkg/auth"
 
 	apiRuntime "bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"github.com/asaskevich/govalidator"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
-	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -467,23 +468,23 @@ func (h *Handler) handleCreateUser(req *restful.Request, resp *restful.Response)
 	}
 
 	// Add workspace role binding, default is system-workspace-admin:system-workspace
-	workspaceRoleBindingName, workspaceRoleBinding := templates.NewWorkspaceRoleBinding(&u, defaultSystemWorkspace, defaultSystemWorkspaceRole)
-	_, err = iamClient.WorkspaceRoleBindings().Create(ctx, workspaceRoleBinding, metav1.CreateOptions{})
-	if err != nil {
-		// rollback the user create
-		iamClient.GlobalRoleBindings().Delete(ctx, globalRoleBindingName, metav1.DeleteOptions{})
-		iamClient.Users().Delete(ctx, userName, metav1.DeleteOptions{})
-		h.userCreatingCount.Add(-1)
-
-		response.HandleError(resp, errors.Errorf("user create: create workspacerolebinding, %v", err))
-		return
-	}
+	//workspaceRoleBindingName, workspaceRoleBinding := templates.NewWorkspaceRoleBinding(&u, defaultSystemWorkspace, defaultSystemWorkspaceRole)
+	//_, err = iamClient.WorkspaceRoleBindings().Create(ctx, workspaceRoleBinding, metav1.CreateOptions{})
+	//if err != nil {
+	//	// rollback the user create
+	//	iamClient.GlobalRoleBindings().Delete(ctx, globalRoleBindingName, metav1.DeleteOptions{})
+	//	iamClient.Users().Delete(ctx, userName, metav1.DeleteOptions{})
+	//	h.userCreatingCount.Add(-1)
+	//
+	//	response.HandleError(resp, errors.Errorf("user create: create workspacerolebinding, %v", err))
+	//	return
+	//}
 
 	//kubeClient := runtime.NewKubeClient(req).Kubernetes()
 	kubeClient := v1alpha1client.KubeClient.Kubernetes()
 
 	clearUser := func(ctx context.Context) {
-		iamClient.WorkspaceRoleBindings().Delete(ctx, workspaceRoleBindingName, metav1.DeleteOptions{})
+		//iamClient.WorkspaceRoleBindings().Delete(ctx, workspaceRoleBindingName, metav1.DeleteOptions{})
 		iamClient.GlobalRoleBindings().Delete(ctx, globalRoleBindingName, metav1.DeleteOptions{})
 		iamClient.Users().Delete(ctx, userName, metav1.DeleteOptions{})
 		h.userCreatingCount.Add(-1)
@@ -678,26 +679,48 @@ func (h *Handler) handleListUserLoginRecords(req *restful.Request, resp *restful
 		response.HandleError(resp, errors.Errorf("list user login records: user %q not exists", name))
 		return
 	}
-
-	loginRecords, err := iamClient.LoginRecords().List(ctx, metav1.ListOptions{})
+	lldapClient, err := lldap.New()
+	if err != nil {
+		log.Errorf("make lldap client err=%v", err)
+		return
+	}
+	loginRecords, err := lldapClient.Users().LoginRecords(req.Request.Context(), name)
 	if err != nil {
 		response.HandleError(resp, errors.Errorf("list user login records: %v", err))
 		return
 	}
+	//loginRecords, err := iamClient.LoginRecords().List(ctx, metav1.ListOptions{})
+	//if err != nil {
+	//	response.HandleError(resp, errors.Errorf("list user login records: %v", err))
+	//	return
+	//}
 
 	records := make([]LoginRecord, 0)
-
-	for _, r := range loginRecords.Items {
-		if strings.HasPrefix(r.Name, name) {
-			records = append(records, LoginRecord{
-				Success:   r.Spec.Success,
-				Type:      string(r.Spec.Type),
-				UserAgent: r.Spec.UserAgent,
-				Reason:    r.Spec.Reason,
-				LoginTime: pointer.Int64(r.CreationTimestamp.Unix()),
-			})
-		}
+	for _, r := range loginRecords {
+		records = append(records, LoginRecord{
+			Type:      "Token",
+			Success:   r.Success,
+			UserAgent: r.UserAgent,
+			Reason:    r.Reason,
+			LoginTime: func() *int64 {
+				t := r.CreationDate.Unix()
+				return &t
+			}(),
+		})
 	}
+	//klog.Infof("loginRecord: %v", records[0])
+
+	//for _, r := range loginRecords.Items {
+	//	if strings.HasPrefix(r.Name, name) {
+	//		records = append(records, LoginRecord{
+	//			Success:   r.Spec.Success,
+	//			Type:      string(r.Spec.Type),
+	//			UserAgent: r.Spec.UserAgent,
+	//			Reason:    r.Spec.Reason,
+	//			LoginTime: pointer.Int64(r.CreationTimestamp.Unix()),
+	//		})
+	//	}
+	//}
 	response.Success(resp, api.NewListResult(records))
 }
 
@@ -723,6 +746,12 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		return
 	}
 
+	lldapClient, err := lldap.New()
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+
 	if userName == constants.Username {
 		// change user password itself
 		if passwordReset.Password == "" {
@@ -731,8 +760,9 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		}
 
 		if len(passwordReset.CurrentPassword) > 0 {
-			if err = bcrypt.CompareHashAndPassword([]byte(user.Spec.EncryptedPassword),
-				[]byte(passwordReset.CurrentPassword)); err != nil {
+			// Password field is mean new password
+			_, err = auth.Login("http://lldap-service.os-system:17170", userName, passwordReset.CurrentPassword)
+			if err != nil {
 				response.HandleError(resp, errors.Errorf("reset password: verify password hash err, %v", err))
 				return
 			}
@@ -762,7 +792,8 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 
 		}
 
-		user.Spec.EncryptedPassword = passwordReset.Password
+		// Reset Password
+		//user.Spec.EncryptedPassword = passwordReset.Password
 		if user.Annotations[constants.UserTerminusWizardStatus] != string(constants.Completed) {
 			// only initializing in progress
 			user.Annotations[constants.UserTerminusWizardStatus] = string(constants.Completed)
@@ -789,6 +820,11 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 
 		}
 
+		err = lldapClient.Users().ResetPassword(ctx, userName, passwordReset.Password)
+		if err != nil {
+			response.HandleError(resp, errors.Errorf("reset password: set user password err, %v", err))
+			return
+		}
 		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
 		if err != nil {
 			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
@@ -813,7 +849,12 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 			return
 		}
 
-		user.Spec.EncryptedPassword = passwordReset.Password
+		//user.Spec.EncryptedPassword = passwordReset.Password
+		err = lldapClient.ResetPassword(ctx, userName, passwordReset.Password)
+		if err != nil {
+			response.HandleError(resp, errors.Errorf("reset password: set user password err, %v", err))
+			return
+		}
 		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
 		if err != nil {
 			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
@@ -930,10 +971,10 @@ func (h *Handler) handleDeleteUser(req *restful.Request, resp *restful.Response)
 					}
 
 					// delete user's workspacerolebinding
-					err = iamClient.WorkspaceRoleBindings().Delete(taskCtx, name, metav1.DeleteOptions{})
-					if err != nil {
-						log.Warnf("delete user: delete %q user workspacerolebinding err, %v", name, err)
-					}
+					//err = iamClient.WorkspaceRoleBindings().Delete(taskCtx, name, metav1.DeleteOptions{})
+					//if err != nil {
+					//	log.Warnf("delete user: delete %q user workspacerolebinding err, %v", name, err)
+					//}
 
 					ksClient := v1alpha1client.KubeClient.Kubernetes()
 
@@ -949,7 +990,13 @@ func (h *Handler) handleDeleteUser(req *restful.Request, resp *restful.Response)
 						log.Warnf("delete userspace %q err, %v", ns, err)
 					}
 
-					err = iamClient.Users().Delete(taskCtx, name, metav1.DeleteOptions{})
+					//err = iamClient.Users().Delete(taskCtx, name, metav1.DeleteOptions{})
+					lldapClient, err := lldap.New()
+					if err != nil {
+						log.Errorf("make lldap client err=%v", err)
+						return
+					}
+					err = lldapClient.Users().Delete(taskCtx, name)
 					if err != nil {
 						if apierrors.IsNotFound(err) {
 							log.Errorf("delete user: error %v", err)
@@ -1155,25 +1202,13 @@ func (h *Handler) handleValidateUserPassword(req *restful.Request, resp *restful
 		return
 	}
 
-	userOp, err := operator.NewUserOperator()
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("validate password: get user operator err, %v", err))
-		return
-	}
-
-	user, err := userOp.GetUser(userPassword.UserName)
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("validate password: get user err, %v", err))
-		return
-	}
-
 	if userPassword.Password == "" {
 		response.HandleError(resp, errors.New("validate password: new password is empty"))
 		return
 	}
 
-	if err = bcrypt.CompareHashAndPassword([]byte(user.Spec.EncryptedPassword),
-		[]byte(userPassword.Password)); err != nil {
+	_, err := auth.Login("http://lldap-service.os-system:17170", userPassword.UserName, userPassword.Password)
+	if err != nil {
 		response.HandleError(resp, errors.Errorf("validate password: verify password hash err, %v", err))
 		return
 	}

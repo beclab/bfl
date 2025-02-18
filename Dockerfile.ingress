@@ -11,7 +11,7 @@ COPY go.sum bytetrade.io/web3os/bfl-ingress/go.sum
 
 RUN git clone https://github.com/beclab/kubesphere-ext.git bytetrade.io/kubesphere-ext && \
     cd bytetrade.io/kubesphere-ext && \
-    git checkout -b $ksVersion
+    git checkout v3.3.0-ext
 
 
 RUN cd bytetrade.io/web3os/bfl-ingress && \
