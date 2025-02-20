@@ -1,11 +1,14 @@
 package v1alpha1
 
 import (
+	"bytetrade.io/web3os/bfl/internal/log"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -102,7 +105,7 @@ func NewReverseProxyConfigurator() (*ReverseProxyConfigurator, error) {
 	}, nil
 }
 
-func (configurator *ReverseProxyConfigurator) CheckConfig(conf *ReverseProxyConfig) error {
+func (conf *ReverseProxyConfig) Check() error {
 	if conf == nil {
 		return errors.New("nil ReverseProxyConfig")
 	}
@@ -172,7 +175,106 @@ func (configurator *ReverseProxyConfigurator) configureDNS(publicIP, localIP, pu
 	return configurator.userOp.UpdateUser(configurator.user, userPatches)
 }
 
-func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context, conf *ReverseProxyConfig) (err error) {
+func (configurator *ReverseProxyConfigurator) markApplying(ctx context.Context, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+	if cm.Annotations == nil {
+		cm.Annotations = map[string]string{}
+	}
+	cm.Annotations[constants.ReverseProxyStatusKey] = constants.ReverseProxyStatusApplying
+	cmApply := &applyCorev1.ConfigMapApplyConfiguration{
+		TypeMetaApplyConfiguration: applyMetav1.TypeMetaApplyConfiguration{
+			Kind:       pointer.String("ConfigMap"),
+			APIVersion: pointer.String(corev1.SchemeGroupVersion.String()),
+		},
+		ObjectMetaApplyConfiguration: &applyMetav1.ObjectMetaApplyConfiguration{
+			Name:        pointer.String(constants.ReverseProxyConfigMapName),
+			Namespace:   pointer.String(constants.Namespace),
+			Annotations: cm.Annotations,
+			Labels:      cm.Labels,
+		},
+		Data: cm.Data,
+	}
+	return configurator.kubeClient.CoreV1().ConfigMaps(constants.Namespace).Apply(
+		ctx,
+		cmApply,
+		metav1.ApplyOptions{FieldManager: constants.ApplyPatchFieldManager},
+	)
+}
+
+func (configurator *ReverseProxyConfigurator) markApplied(ctx context.Context, cm *corev1.ConfigMap, conf *ReverseProxyConfig) error {
+	confStr, err := json.Marshal(conf)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal applied reverse proxy config")
+	}
+	if cm.Annotations == nil {
+		cm.Annotations = map[string]string{}
+	}
+	cm.Annotations[constants.ReverseProxyStatusKey] = constants.ReverseProxyStatusApplied
+	cm.Annotations[constants.ReverseProxyLastAppliedConfigKey] = string(confStr)
+	cmApply := &applyCorev1.ConfigMapApplyConfiguration{
+		TypeMetaApplyConfiguration: applyMetav1.TypeMetaApplyConfiguration{
+			Kind:       pointer.String("ConfigMap"),
+			APIVersion: pointer.String(corev1.SchemeGroupVersion.String()),
+		},
+		ObjectMetaApplyConfiguration: &applyMetav1.ObjectMetaApplyConfiguration{
+			Name:        pointer.String(constants.ReverseProxyConfigMapName),
+			Namespace:   pointer.String(constants.Namespace),
+			Annotations: cm.Annotations,
+			Labels:      cm.Labels,
+		},
+		Data: cm.Data,
+	}
+	_, err = configurator.kubeClient.CoreV1().ConfigMaps(constants.Namespace).Apply(
+		ctx,
+		cmApply,
+		metav1.ApplyOptions{FieldManager: constants.ApplyPatchFieldManager},
+	)
+	return err
+}
+
+func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context) (err error) {
+	cm, err := configurator.kubeClient.CoreV1().ConfigMaps(constants.Namespace).Get(ctx, constants.ReverseProxyConfigMapName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Info("reverse proxy configmap not found, skip configuring")
+			return nil
+		}
+		log.Error(err, "failed to get reverse proxy configmap")
+		return errors.Wrap(err, "failed to get the configmap for reverse proxy config")
+	}
+	log.Infof("reverse proxy configmap found: %#v", cm)
+	conf := &ReverseProxyConfig{}
+	if err := conf.readFromReverseProxyConfigMapData(cm.Data); err != nil {
+		return errors.Wrap(err, "failed to read reverse proxy configmap data")
+	}
+	shouldConfigure := func() bool {
+		if err := conf.Check(); err != nil {
+			log.Warn("invalid reverse proxy config, skip configuring", err)
+			return false
+		}
+		if cm.Annotations == nil {
+			return true
+		}
+		if status, ok := cm.Annotations[constants.ReverseProxyStatusKey]; !ok || status != constants.ReverseProxyStatusApplied {
+			return true
+		}
+		lastAppliedConfigStr, ok := cm.Annotations[constants.ReverseProxyLastAppliedConfigKey]
+		if !ok {
+			return true
+		}
+		lastAppliedConfig := &ReverseProxyConfig{}
+		if err := json.Unmarshal([]byte(lastAppliedConfigStr), lastAppliedConfig); err != nil {
+			log.Error(err, "failed to marshal last applied config of reverse proxy, will try to configure again")
+			return true
+		}
+		if !reflect.DeepEqual(conf, lastAppliedConfig) {
+			return true
+		}
+		return false
+	}()
+	if !shouldConfigure {
+		log.Info("current applied reverse proxy config is already the expected one")
+		return nil
+	}
 	var publicIP, localIP, publicCName string
 	defer func() {
 		if err != nil {
@@ -182,8 +284,12 @@ func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context, con
 		if err != nil {
 			return
 		}
-		err = errors.Wrap(conf.writeToReverseProxyConfigMap(ctx), "failed to write reverse proxy config data")
+		err = errors.Wrap(configurator.markApplied(ctx, cm, conf), "failed to update reverse proxy configmap to mark apply completed")
 	}()
+	cm, err = configurator.markApplying(ctx, cm)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark reverse proxy configmap as applying")
+	}
 	localL4ProxyIP, err := k8sutil.GetL4ProxyNodeIP(ctx, 30*time.Second)
 	if err != nil {
 		return errors.Wrap(err, "failed to get local l4 proxy ip")
