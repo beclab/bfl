@@ -420,7 +420,7 @@ func NewDefault() Configuration {
 		GzipMinLength:              256,
 		GzipTypes:                  gzipTypes,
 		KeepAlive:                  75,
-		KeepAliveRequests:          100,
+		KeepAliveRequests:          1000,
 		LargeClientHeaderBuffers:   "6 10k",
 		EnableMultiAccept:          true,
 		MaxWorkerConnections:       16384,
