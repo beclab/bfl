@@ -2,7 +2,7 @@ FROM golang:1.18 as builder
 
 WORKDIR /workspace
 
-ENV ksVersion=v3.3.0
+ENV ksVersion=release-1.11-ext
 
 
 # Copy the Go Modules manifests
@@ -11,7 +11,7 @@ COPY go.sum bytetrade.io/web3os/bfl-ingress/go.sum
 
 RUN git clone https://github.com/beclab/kubesphere-ext.git bytetrade.io/kubesphere-ext && \
     cd bytetrade.io/kubesphere-ext && \
-    git checkout -b $ksVersion
+    git checkout $ksVersion
 
 
 RUN cd bytetrade.io/web3os/bfl-ingress && \
