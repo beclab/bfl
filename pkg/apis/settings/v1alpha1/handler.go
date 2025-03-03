@@ -272,14 +272,13 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		}
 	}
 
-	reverseProxyConfigurator, err := NewReverseProxyConfigurator()
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("create reverse proxy configurator: %v", err))
+	if err = reverseProxyConf.Check(); err != nil {
+		response.HandleError(resp, errors.Wrap(err, "invalid reverse proxy configuration"))
 		return
 	}
 
-	if err = reverseProxyConfigurator.CheckConfig(reverseProxyConf); err != nil {
-		response.HandleError(resp, errors.Wrap(err, "invalid reverse proxy configuration"))
+	if err = reverseProxyConf.writeToReverseProxyConfigMap(ctx); err != nil {
+		response.HandleError(resp, errors.Wrap(err, "failed to write reverse proxy configuration"))
 		return
 	}
 
@@ -321,11 +320,6 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 	}
 	o.L4ProxyNamespace = namespace
 
-	if err = reverseProxyConfigurator.Configure(ctx, reverseProxyConf); err != nil {
-		response.HandleError(resp, errors.Wrap(err, "failed to configure reverse proxy"))
-		return
-	}
-
 	log.Info("creating async task to enable https")
 
 	enableHTTPSTask, err := settingsTask.NewEnableHTTPSTask(&o)
@@ -350,21 +344,16 @@ func (h *Handler) handleChangeReverseProxyConfig(req *restful.Request, resp *res
 		response.HandleError(resp, err)
 		return
 	}
-	reverseProxyConfigurator, err := NewReverseProxyConfigurator()
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("create reverse proxy configurator: %v", err))
-		return
-	}
-
-	if err := reverseProxyConfigurator.CheckConfig(conf); err != nil {
+	if err := conf.Check(); err != nil {
 		response.HandleError(resp, errors.Wrap(err, "invalid reverse proxy config"))
 		return
 	}
 
-	if err := reverseProxyConfigurator.Configure(ctx, conf); err != nil {
-		response.HandleError(resp, errors.Wrap(err, "failed to configure reverse proxy"))
+	if err := conf.writeToReverseProxyConfigMap(ctx); err != nil {
+		response.HandleError(resp, errors.Wrap(err, "failed to write reverse proxy config"))
 		return
 	}
+
 	response.SuccessNoData(resp)
 }
 
