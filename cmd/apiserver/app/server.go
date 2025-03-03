@@ -1,8 +1,10 @@
 package app
 
 import (
+	"bytetrade.io/web3os/bfl/pkg/watchers/reverse_proxy"
 	"context"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	"os"
 	"time"
 
@@ -23,21 +25,11 @@ import (
 var logLevel string
 
 func NewAPPServerCommand() *cobra.Command {
-	config := ctrl.GetConfigOrDie()
-	ctx, cancel := context.WithCancel(context.Background())
-	_ = signals.SetupSignalHandler(ctx, cancel)
-
-	w := watchers.NewWatchers(ctx, config, 0)
-	watchers.AddToWatchers[v1alpha1.Application](w, apps.GVR,
-		(&apps.Subscriber{Subscriber: watchers.NewSubscriber(w)}).WithKubeConfig(config).HandleEvent())
-
 	cmd := &cobra.Command{
 		Use:   "bfl",
 		Short: "REST API for launcher",
 		Long:  `The BFL ( Backend For Launcher ) provides REST API interfaces for the launcher`,
 		Run: func(cmd *cobra.Command, args []string) {
-			go w.Run(1)
-
 			if err := Run(); err != nil {
 				log.Errorf("failed to run apiserver: %+v", err)
 				os.Exit(1)
@@ -78,6 +70,28 @@ func Run() error {
 		"appPortNamePrefix", constants.AppPortNamePrefix,
 		"requestURLNoAuthList", constants.RequestURLWhiteList,
 	)
+
+	// watchers
+	config := ctrl.GetConfigOrDie()
+	ctx, cancel := context.WithCancel(context.Background())
+	_ = signals.SetupSignalHandler(ctx, cancel)
+
+	w := watchers.NewWatchers(ctx, config, 0)
+	err := watchers.AddToWatchers[v1alpha1.Application](w, apps.GVR,
+		(&apps.Subscriber{Subscriber: watchers.NewSubscriber(w)}).WithKubeConfig(config).HandleEvent())
+	if err != nil {
+		return fmt.Errorf("failed to add app watcher: %w", err)
+	}
+	reverseProxySubscriber, err := reverse_proxy.NewSubscriber(w)
+	if err != nil {
+		return fmt.Errorf("failed to initialize reverse proxy subscriber: %v", err)
+	}
+	err = watchers.AddToWatchers[corev1.ConfigMap](w, reverse_proxy.GVR, reverseProxySubscriber.Handler())
+	if err != nil {
+		return fmt.Errorf("failed to add reverse proxy watcher: %w", err)
+	}
+	log.Info("start watchers")
+	go w.Run(1)
 
 	// tasks
 	log.Info("start task loop")

@@ -140,6 +140,10 @@ var (
 	ReverseProxyAgentImageVersion    = "v0.1.0"
 	DefaultReverseProxyConfigMapName = "default-reverse-proxy-config"
 	ReverseProxyConfigMapName        = "reverse-proxy-config"
+	ReverseProxyLastAppliedConfigKey = "last-applied-config"
+	ReverseProxyStatusKey            = "status"
+	ReverseProxyStatusApplying       = "applying"
+	ReverseProxyStatusApplied        = "applied"
 
 	ApplyPatchFieldManager = "application/apply-patch"
 
