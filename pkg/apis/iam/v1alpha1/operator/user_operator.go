@@ -40,6 +40,15 @@ func NewUserOperator() (*UserOperator, error) {
 	}, nil
 }
 
+func NewUserOperatorWithContext(ctx context.Context) (*UserOperator, error) {
+	uop, err := NewUserOperator()
+	if err != nil {
+		return nil, err
+	}
+	uop.ctx = ctx
+	return uop, nil
+}
+
 func NewUserOperatorOrDie() *UserOperator {
 	return &UserOperator{
 		client: users.NewResourceUserClientOrDie(),
