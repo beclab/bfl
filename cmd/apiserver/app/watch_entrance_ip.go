@@ -21,7 +21,8 @@ import (
 )
 
 func watchEntranceIP() {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
 	if err := watch(ctx); err != nil {
 		log.Errorf("%+v", err)
@@ -35,7 +36,7 @@ func watch(ctx context.Context) (err error) {
 		terminusName, zone string
 	)
 
-	op, err = operator.NewUserOperator()
+	op, err = operator.NewUserOperatorWithContext(ctx)
 	if err != nil {
 		return errors.WithStack(err)
 	}
