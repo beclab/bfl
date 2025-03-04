@@ -2,7 +2,7 @@ FROM golang:1.18 as builder
 
 WORKDIR /workspace
 
-ENV ksVersion=release-1.11
+ENV ksVersion=release-1.11-ext
 
 # Copy the Go Modules manifests
 COPY go.mod bytetrade.io/web3os/bfl/go.mod
