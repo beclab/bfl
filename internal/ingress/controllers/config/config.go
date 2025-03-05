@@ -402,7 +402,7 @@ func NewDefault() Configuration {
 		BlockReferers:              defBlockEntity,
 		ClientHeaderBufferSize:     "10k",
 		ClientHeaderTimeout:        60,
-		ClientBodyBufferSize:       "8k",
+		ClientBodyBufferSize:       "10m",
 		ClientBodyTimeout:          60,
 		EnableUnderscoresInHeaders: false,
 		ErrorLogLevel:              errorLevel,
