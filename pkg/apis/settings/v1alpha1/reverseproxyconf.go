@@ -232,6 +232,10 @@ func (configurator *ReverseProxyConfigurator) markApplied(ctx context.Context, c
 }
 
 func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context) (err error) {
+	configurator.user, err = configurator.userOp.GetUser("")
+	if err != nil {
+		return errors.Wrap(err, "failed to get user")
+	}
 	cm, err := configurator.kubeClient.CoreV1().ConfigMaps(constants.Namespace).Get(ctx, constants.ReverseProxyConfigMapName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
