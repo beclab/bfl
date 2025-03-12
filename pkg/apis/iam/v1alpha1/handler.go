@@ -426,8 +426,8 @@ func (h *Handler) handleCreateUser(req *restful.Request, resp *restful.Response)
 		return
 	}
 	// cluster's free cpu core  must greater than user's cpu-limit core
-	if cpu.CmpInt64(int64(metrics.CPU.Total-metrics.CPU.Usage)) >= 0 {
-		response.HandleBadRequest(resp, errors.Errorf("Unable to create user: Insufficient memory available in the cluster to meet the quota, required is: %.1f, but available is: %.1f", cpuLimit, metrics.CPU.Total-metrics.CPU.Usage))
+	if (metrics.CPU.Total-metrics.CPU.Usage)-cpu.AsApproximateFloat64() < 0 {
+		response.HandleBadRequest(resp, errors.Errorf("Unable to create user: Insufficient cpu available in the cluster to meet the quota, required is: %.1f, but available is: %.1f", cpuLimit, metrics.CPU.Total-metrics.CPU.Usage))
 		return
 	}
 
