@@ -3,9 +3,13 @@ package v1alpha1
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
+	"os"
 	"strings"
 
 	"bytetrade.io/web3os/bfl/pkg/api/response"
+	v1alpha1client "bytetrade.io/web3os/bfl/pkg/client/clientset/v1alpha1"
 	"bytetrade.io/web3os/bfl/pkg/client/dynamic_client"
 	"bytetrade.io/web3os/bfl/pkg/client/dynamic_client/apps"
 	"bytetrade.io/web3os/bfl/pkg/constants"
@@ -47,6 +51,13 @@ func (h *Handler) handleGetHeadscaleSshAcl(req *restful.Request, resp *restful.R
 
 	// get headscale acl env
 	allowSSH := false
+	for _, acl := range app.Spec.TailScale.ACLs {
+		if utils.ListContains(acl.Dst, "*:22") && strings.ToLower(acl.Proto) == "tcp" {
+			allowSSH = true
+			break
+		}
+	}
+
 	for _, acl := range app.Spec.TailScaleACLs {
 		if utils.ListContains(acl.Dst, "*:22") && strings.ToLower(acl.Proto) == "tcp" {
 			allowSSH = true
@@ -58,13 +69,31 @@ func (h *Handler) handleGetHeadscaleSshAcl(req *restful.Request, resp *restful.R
 }
 
 func (h *Handler) handleDisableHeadscaleSshAcl(req *restful.Request, resp *restful.Response) {
-	h.setHeadscaleAcl(req, resp, "settings", nil)
+	app, err := h.findApp(req.Request.Context(), "settings")
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	acls := make([]apps.ACL, 0)
+	for _, acl := range app.Spec.TailScale.ACLs {
+		if acl.Dst[0] == "*:22" {
+			continue
+		}
+		acls = append(acls, acl)
+	}
+
+	h.setHeadscaleAcl(req, resp, "settings", acls)
 }
 
 func (h *Handler) handleEnableHeadscaleSshAcl(req *restful.Request, resp *restful.Response) {
-	h.setHeadscaleAcl(req, resp, "settings", []apps.ACL{
-		{Proto: "tcp", Dst: []string{"*:22"}},
-	})
+	app, err := h.findApp(req.Request.Context(), "settings")
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	acls := app.Spec.TailScale.ACLs
+	acls = append(acls, apps.ACL{Proto: "tcp", Dst: []string{"*:22"}})
+	h.setHeadscaleAcl(req, resp, "settings", acls)
 }
 
 // app's acl
@@ -78,7 +107,14 @@ func (h *Handler) handleGetHeadscaleAppAcl(req *restful.Request, resp *restful.R
 		return
 	}
 
-	var acls []Acl
+	acls := make([]Acl, 0)
+	for _, acl := range app.Spec.TailScale.ACLs {
+		acls = append(acls, Acl{
+			Proto: acl.Proto,
+			Dst:   acl.Dst,
+		})
+	}
+	// just to maintain compatibility with existing application
 	for _, acl := range app.Spec.TailScaleACLs {
 		acls = append(acls, Acl{
 			Proto: acl.Proto,
@@ -96,8 +132,52 @@ func (h *Handler) handleUpdateHeadscaleAppAcl(req *restful.Request, resp *restfu
 		response.HandleError(resp, err)
 		return
 	}
+	klog.Infof("appsacl: %v", acls)
+	if isPortDuplicate(acls) {
+		response.HandleBadRequest(resp, errors.New("ports duplicated"))
+		return
+	}
 
 	h.setHeadscaleAcl(req, resp, appName, acls)
+}
+
+type wrapACL struct {
+	AppName  string `json:"appName"`
+	AppOwner string `json:"appOwner"`
+	Acl      `json:",inline"`
+}
+
+func (h *Handler) handleHeadscaleACLList(req *restful.Request, resp *restful.Response) {
+	apps, err := h.appList(req.Request.Context())
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	acls := make([]wrapACL, 0)
+	for _, app := range apps {
+		for _, acl := range app.Spec.TailScale.ACLs {
+			acls = append(acls, wrapACL{
+				AppName:  app.Spec.Name,
+				AppOwner: app.Spec.Owner,
+				Acl: Acl{
+					Proto: acl.Proto,
+					Dst:   acl.Dst,
+				},
+			})
+		}
+		// just to maintain compatibility with existing application
+		for _, acl := range app.Spec.TailScaleACLs {
+			acls = append(acls, wrapACL{
+				AppName:  app.Spec.Name,
+				AppOwner: app.Spec.Owner,
+				Acl: Acl{
+					Proto: acl.Proto,
+					Dst:   acl.Dst,
+				},
+			})
+		}
+	}
+	response.Success(resp, acls)
 }
 
 func (h *Handler) setHeadscaleAcl(req *restful.Request, resp *restful.Response, appName string, acls []apps.ACL) {
@@ -122,7 +202,8 @@ func (h *Handler) setHeadscaleAcl(req *restful.Request, resp *restful.Response, 
 			return err
 		}
 
-		updateApp.Spec.TailScaleACLs = acls
+		updateApp.Spec.TailScale.ACLs = acls
+		updateApp.Spec.TailScaleACLs = []apps.ACL{}
 		_, err = client.Update(req.Request.Context(), updateApp, metav1.UpdateOptions{})
 
 		return err
@@ -167,13 +248,6 @@ func (h *Handler) parseAcl(req *restful.Request) ([]apps.ACL, error) {
 		return nil, err
 	}
 
-	for _, a := range acls {
-		acls = append(acls, apps.ACL{
-			Proto: a.Proto,
-			Dst:   a.Dst,
-		})
-	}
-
 	err = apps.CheckTailScaleACLs(acls)
 	if err != nil {
 		klog.Error("check acl error, ", err)
@@ -181,4 +255,132 @@ func (h *Handler) parseAcl(req *restful.Request) ([]apps.ACL, error) {
 	}
 
 	return acls, nil
+}
+
+func calTailScaleSubnet() (subnets []string, err error) {
+	kubeClient := v1alpha1client.KubeClient.Kubernetes()
+	nodeName := os.Getenv("NODE_NAME")
+	if nodeName == "" {
+		return subnets, errors.New("get node name from env failed")
+	}
+	node, err := kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	if err != nil {
+		return subnets, err
+	}
+	ipAddress := node.Annotations["projectcalico.org/IPv4Address"]
+	_, ipnet, err := net.ParseCIDR(ipAddress)
+	if err != nil {
+		return subnets, err
+	}
+	subnets = append(subnets, ipnet.String())
+	return subnets, nil
+}
+
+func (h *Handler) handleGetTailScaleSubnet(req *restful.Request, resp *restful.Response) {
+	app, err := h.findApp(req.Request.Context(), "settings")
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	subRoutes := make([]string, 0)
+	for _, r := range app.Spec.TailScale.SubRoutes {
+		subRoutes = append(subRoutes, r)
+	}
+	response.Success(resp, subRoutes)
+}
+
+func (h *Handler) handleEnableTailScaleSubnet(req *restful.Request, resp *restful.Response) {
+	tailScaleSubRoutes, err := calTailScaleSubnet()
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	h.setTailScaleSubRoutes(req, resp, "settings", tailScaleSubRoutes)
+}
+
+func (h *Handler) handleDisableTailScaleSubnet(req *restful.Request, resp *restful.Response) {
+	var tailScaleSubRoutes []string
+	h.setTailScaleSubRoutes(req, resp, "settings", tailScaleSubRoutes)
+}
+
+func (h *Handler) setTailScaleSubRoutes(req *restful.Request, resp *restful.Response, appName string, subRoutes []string) {
+	app, err := h.findApp(req.Request.Context(), appName)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		client, err := dynamic_client.NewResourceClient[apps.Application, apps.ApplicationList](apps.ApplicationGvr)
+		if err != nil {
+			klog.Error("failed to get client: ", err)
+			return err
+		}
+		updateApp, err := client.Get(req.Request.Context(), app.Name, metav1.GetOptions{})
+		if err != nil {
+			klog.Error("failed to get app: ", err, ", ", app.Name)
+			return err
+		}
+		updateApp.Spec.TailScale.SubRoutes = subRoutes
+		_, err = client.Update(req.Request.Context(), updateApp, metav1.UpdateOptions{})
+		return err
+	})
+	if err != nil {
+		klog.Errorf("Failed to update tailScale subRoutes %v", err)
+		response.HandleError(resp, err)
+		return
+	}
+	response.SuccessNoData(resp)
+}
+
+func (h *Handler) appList(ctx context.Context) ([]apps.Application, error) {
+	client, err := dynamic_client.NewResourceClient[apps.Application, apps.ApplicationList](apps.ApplicationGvr)
+	if err != nil {
+		klog.Error("failed to get client: ", err)
+		return nil, err
+	}
+
+	appList, err := client.List(ctx, metav1.ListOptions{})
+	if err != nil {
+		klog.Error("list app error: ", err)
+		return nil, err
+	}
+	filteredApps := make([]apps.Application, 0)
+	for _, a := range appList {
+		if a.Spec.Owner != constants.Username {
+			continue
+		}
+		filteredApps = append(filteredApps, a)
+	}
+
+	return filteredApps, nil
+}
+
+func isPortDuplicate(acls []apps.ACL) bool {
+	portMap := make(map[string]struct{})
+
+	for _, acl := range acls {
+		for _, dst := range acl.Dst {
+			if acl.Proto == "" {
+				tcpKey := fmt.Sprintf("tcp:%s", dst)
+				udpKey := fmt.Sprintf("udp:%s", dst)
+				if _, ok := portMap[tcpKey]; ok {
+					return true
+				}
+				if _, ok := portMap[udpKey]; ok {
+					return true
+				}
+
+				portMap[tcpKey] = struct{}{}
+				portMap[udpKey] = struct{}{}
+			} else {
+				key := fmt.Sprintf("%s:%s", acl.Proto, dst)
+				if _, exists := portMap[key]; exists {
+					return true
+				}
+				portMap[key] = struct{}{}
+			}
+		}
+	}
+
+	return false
 }
