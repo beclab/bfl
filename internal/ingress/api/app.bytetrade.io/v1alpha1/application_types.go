@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -114,6 +115,14 @@ type ApplicationList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Application `json:"items"`
 }
+
+var (
+	AppEntranceCertConfigMapLabel   = fmt.Sprintf("%s/%s", GroupVersion.Group, "custom-domain-cert")
+	AppEntranceCertConfigMapNameTpl = "%s-ssl-config"
+	AppEntranceCertConfigMapCertKey = "cert"
+	AppEntranceCertConfigMapKeyKey  = "key"
+	AppEntranceCertConfigMapZoneKey = "zone"
+)
 
 func init() {
 	SchemeBuilder.Register(&Application{}, &ApplicationList{})

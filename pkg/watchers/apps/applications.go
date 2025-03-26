@@ -2,7 +2,14 @@ package apps
 
 import (
 	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"strings"
 	"time"
@@ -16,7 +23,8 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/watchers"
 
 	"github.com/pkg/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
@@ -102,7 +110,7 @@ func (s *Subscriber) Do(ctx context.Context, obj interface{}, action watchers.Ac
 	case watchers.ADD, watchers.UPDATE:
 		request, err = s.getObj(request.GetName())
 		if err != nil {
-			return nil
+			return err
 		}
 		obj = request
 		if err := s.checkCustomDomainStatus(request); err != nil {
@@ -157,7 +165,9 @@ func (s *Subscriber) checkCustomDomainStatus(app *appv1.Application) error {
 			break
 		}
 		customDomainObj[constants.ApplicationCustomDomainCnameStatus] = domainStatus
-		if domainStatus == constants.CustomDomainCnameStatusPending {
+		if domainStatus == constants.CustomDomainCnameStatusPending ||
+			domainStatus == constants.CustomDomainCnameStatusCertNotFound ||
+			domainStatus == constants.CustomDomainCnameStatusCertInvalid {
 			existsPending = true
 		}
 	}
@@ -199,7 +209,7 @@ func (s *Subscriber) updateApp(app *appv1.Application) error {
 		return nil
 	}
 
-	err = s.dynamicClient.Update(ctx, &unstructured.Unstructured{Object: obj}, v1.UpdateOptions{}, app)
+	err = s.dynamicClient.Update(ctx, &unstructured.Unstructured{Object: obj}, metav1.UpdateOptions{}, app)
 	if err != nil {
 		return err
 	}
@@ -221,6 +231,15 @@ func (s *Subscriber) checkStatus(domainName string) (string, error) {
 		return constants.CustomDomainCnameStatusNotset, nil
 	}
 
+	reverseProxyType, err := s.getReverseProxyType()
+	if err != nil {
+		return "", errors.Wrap(err, "get reverse proxy type error")
+	}
+
+	if reverseProxyType == constants.ReverseProxyTypeFRP {
+		return s.getStatusByCustomDomainCert(domainName)
+	}
+
 	cnameStatus, err := cm.GetCustomDomainOnCloudflare(domainName)
 	if err != nil {
 		errmsg := cm.GetCustomDomainErrorStatus(err)
@@ -240,6 +259,122 @@ func (s *Subscriber) checkStatus(domainName string) (string, error) {
 	}
 
 	return s.mergeCnameStatus(sslStatus, hostnameStatus), nil
+}
+
+func (s *Subscriber) getStatusByCustomDomainCert(domainName string) (string, error) {
+	certConfigMapName := fmt.Sprintf(appv1.AppEntranceCertConfigMapNameTpl, domainName)
+	certConfigMap, err := s.client.Kubernetes().CoreV1().ConfigMaps(constants.Namespace).Get(context.Background(), certConfigMapName, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return constants.CustomDomainCnameStatusCertNotFound, nil
+		}
+		return "", errors.Wrapf(err, "get cert configmap for custom domain %s error", domainName)
+	}
+	if certConfigMap.Data == nil {
+		return constants.CustomDomainCnameStatusCertNotFound, nil
+	}
+	certData := certConfigMap.Data[appv1.AppEntranceCertConfigMapCertKey]
+	keyData := certConfigMap.Data[appv1.AppEntranceCertConfigMapKeyKey]
+	zone := certConfigMap.Data[appv1.AppEntranceCertConfigMapZoneKey]
+	if certData == "" || keyData == "" || zone == "" {
+		return constants.CustomDomainCnameStatusCertNotFound, nil
+	}
+	sslErr := CheckSSLCertificate([]byte(certData), []byte(keyData), zone)
+	if sslErr != nil {
+		return constants.CustomDomainCnameStatusCertInvalid, nil
+	}
+	return constants.CustomDomainCnameStatusActive, nil
+}
+
+func CheckSSLCertificate(cert, key []byte, hostname string) error {
+	block, _ := pem.Decode(cert)
+	if block == nil {
+		return errors.New("certificate is invalid")
+	}
+	pub, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return errors.New("certificate is invalid")
+	}
+	// verify hostname
+	err = pub.VerifyHostname(hostname)
+	if err != nil {
+		return err
+	}
+
+	// verify certificate whether valid or expired
+	currentTime := time.Now()
+	if currentTime.Before(pub.NotBefore) {
+		return errors.New("certificate is not yet valid")
+	}
+	if currentTime.After(pub.NotAfter) {
+		return errors.New("certificate has expired")
+	}
+
+	block, _ = pem.Decode(key)
+	if block == nil {
+		return errors.New("error decoding private key PEM block")
+	}
+
+	hash := sha256.Sum256([]byte("hello"))
+
+	switch block.Type {
+	case "PRIVATE KEY":
+		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("error parsing pkcs#8 private key: %v", err)
+		}
+		signature, err := rsa.SignPKCS1v15(rand.Reader, key.(*rsa.PrivateKey), crypto.SHA256, hash[:])
+		if err != nil {
+			return errors.New("failed to sign message")
+		}
+		rsaPub, ok := pub.PublicKey.(*rsa.PublicKey)
+		if !ok {
+			return errors.New("not RSA public key")
+		}
+		err = rsa.VerifyPKCS1v15(rsaPub, crypto.SHA256, hash[:], signature)
+		if err != nil {
+			return errors.New("certificate and private key not match")
+		}
+	case "EC PRIVATE KEY":
+		key, err := x509.ParseECPrivateKey(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("error parsing ecdsa private key: %v", err)
+		}
+
+		r, s, err := ecdsa.Sign(rand.Reader, key, hash[:])
+		if err != nil {
+			return fmt.Errorf("ecdsa sign err: %v", err)
+		}
+		verified := ecdsa.Verify(pub.PublicKey.(*ecdsa.PublicKey), hash[:], r, s)
+		if !verified {
+			return errors.New("certificate and private key not match")
+		}
+	case "RSA PRIVATE KEY":
+		key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("error parsing rsa private key: %v", err)
+		}
+		err = key.Validate()
+		if err != nil {
+			return fmt.Errorf("rsa private key failed validation: %v", err)
+		}
+		signature, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, hash[:])
+		if err != nil {
+			return errors.New("failed to sign message")
+		}
+		rsaPub, ok := pub.PublicKey.(*rsa.PublicKey)
+		if !ok {
+			return errors.New("not RSA public key")
+		}
+		err = rsa.VerifyPKCS1v15(rsaPub, crypto.SHA256, hash[:], signature)
+		if err != nil {
+			return errors.New("certificate and private key not match")
+		}
+	default:
+		return fmt.Errorf("unknown private key type: %s", block.Type)
+	}
+
+	return nil
 }
 
 func (s *Subscriber) removeCustomDomainCnameData(app *appv1.Application) error {
@@ -301,10 +436,18 @@ func (s *Subscriber) getTerminusName() (string, error) {
 	return terminusName, nil
 }
 
+func (s *Subscriber) getReverseProxyType() (string, error) {
+	op, err := operator.NewUserOperator()
+	if err != nil {
+		return "", err
+	}
+	return op.GetReverseProxyType()
+}
+
 func (s *Subscriber) getObj(appName string) (*appv1.Application, error) {
 	var app appv1.Application
 
-	if err := s.dynamicClient.Get(context.Background(), appName, v1.GetOptions{}, &app); err != nil {
+	if err := s.dynamicClient.Get(context.Background(), appName, metav1.GetOptions{}, &app); err != nil {
 		return nil, err
 	}
 	return &app, nil

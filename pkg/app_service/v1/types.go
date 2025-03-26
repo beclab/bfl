@@ -1,6 +1,7 @@
 package app_service
 
 import (
+	appv1 "bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 	"time"
 
 	k8sv1 "k8s.io/api/apps/v1"
@@ -109,6 +110,14 @@ const (
 	ApplicationSettingsDomainKey     = "customDomain"
 	ApplicationAuthorizationLevelKey = "authorizationLevel"
 )
+
+type EntrancesWithCustomDomain []EntranceWithCustomDomain
+
+type EntranceWithCustomDomain struct {
+	appv1.Entrance
+	AppName      string `json:"app_name"`
+	CustomDomain string `json:"custom_domain"`
+}
 
 type ApplicationsSettings map[string]interface{}
 
