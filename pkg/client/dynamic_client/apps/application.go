@@ -62,6 +62,7 @@ type ApplicationSpec struct {
 	Entrances []Entrance `json:"entrances,omitempty"`
 
 	Ports         []ServicePort `json:"ports,omitempty"`
+	TailScale     TailScale     `json:"tailscale,omitempty"`
 	TailScaleACLs []ACL         `json:"tailscaleAcls,omitempty"`
 
 	// the extend settings of the application
@@ -73,6 +74,11 @@ type ACL struct {
 	Src    []string `json:"src,omitempty"`
 	Proto  string   `json:"proto"`
 	Dst    []string `json:"dst"`
+}
+
+type TailScale struct {
+	ACLs      []ACL    `json:"acls,omitempty"`
+	SubRoutes []string `json:"subRoutes,omitempty"`
 }
 
 type EntranceState string
