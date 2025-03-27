@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"bytes"
+	"bytetrade.io/web3os/bfl/pkg/watchers/apps"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -516,6 +517,10 @@ func (r *NginxController) writeCustomDomainCertificates() error {
 			klog.Warningf("invalid custom domain config map %s, zone: %s, certData: %s, keyData: %s", cm.Name, zone, certData, keyData)
 			continue
 		}
+		if err := apps.CheckSSLCertificate([]byte(certData), []byte(keyData), zone); err != nil {
+			klog.Errorf("invalid certficate for zone %s: %v, skip.", zone, err)
+			continue
+		}
 		certPath := filepath.Join(nginx.DefNgxSSLCertificationPath, fmt.Sprintf("%s.crt", zone))
 		keyPath := filepath.Join(nginx.DefNgxSSLCertificationPath, fmt.Sprintf("%s.key", zone))
 
@@ -781,12 +786,12 @@ func (r *NginxController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		time.Sleep(300 * time.Millisecond)
 		if err := r.render(); err != nil {
 			log.Error(err, "unable to render nginx config error")
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, err
 		}
 
 		if err = modifyAllowedDomainTimestamp(); err != nil {
 			log.Error(err, "modify allowed domain level by tailscale")
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, err
 		}
 	}
 
