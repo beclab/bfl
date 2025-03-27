@@ -71,6 +71,13 @@ type NginxController struct {
 
 	// user's applications
 	apps []v1alpha1App.Application
+
+	customDomainsWithCert map[string]customDomainCertPath
+}
+
+type customDomainCertPath struct {
+	certPath string
+	keyPath  string
 }
 
 func (r *NginxController) RunNginx() error {
@@ -177,6 +184,21 @@ func (r *NginxController) generateCustomDomainNginxServers() ([]config.CustomSer
 	servers := make([]config.CustomServer, 0)
 	alias := []string{}
 
+	userop, err := operator.NewUserOperator()
+	if err != nil {
+		return nil, fmt.Errorf("create user operator err: %v", err)
+	}
+	reverseProxyType, err := userop.GetReverseProxyType()
+	if err != nil {
+		return nil, fmt.Errorf("get reverse proxy type err: %v", err)
+	}
+
+	if reverseProxyType == constants.ReverseProxyTypeFRP {
+		if err := r.writeCustomDomainCertificates(); err != nil {
+			return nil, fmt.Errorf("failed to write custom domain certificates: %v", err)
+		}
+	}
+
 	for _, app := range r.apps {
 		if app.Spec.Entrances == nil || len(app.Spec.Entrances) == 0 {
 			klog.Warningf("invalid app %q custom domain, ignore it. app=%s", app.Spec.Name, utils.PrettyJSON(app.Spec))
@@ -209,7 +231,26 @@ func (r *NginxController) generateCustomDomainNginxServers() ([]config.CustomSer
 				continue
 			}
 
-			if r.sslConfigData != nil {
+			if certPath, certExists := r.customDomainsWithCert[customDomainName]; certExists && reverseProxyType == constants.ReverseProxyTypeFRP {
+				s := config.CustomServer{
+					Server: config.Server{
+						Hostname:   customDomainName,
+						Aliases:    alias,
+						EnableSSL:  true,
+						EnableAuth: true,
+						Locations: []config.Location{
+							{
+								Prefix:    "/",
+								ProxyPass: fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", entranceServiceAddr.Host, app.Spec.Namespace, entranceServiceAddr.Port),
+							},
+						},
+						EnableAnalytics: false,
+					},
+					SslCertPath: certPath.certPath,
+					SslKeyPath:  certPath.keyPath,
+				}
+				servers = append(servers, s)
+			} else if r.sslConfigData != nil {
 				zone := r.sslConfigData["zone"]
 				certName, keyName := fmt.Sprintf("x.%s.crt", zone), fmt.Sprintf("x.%s.key", zone)
 
@@ -457,6 +498,40 @@ func (r *NginxController) writeCertificates(certData, keyData string) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (r *NginxController) writeCustomDomainCertificates() error {
+	customDomainsWithCert := make(map[string]customDomainCertPath)
+	cmList := corev1.ConfigMapList{}
+	err := r.List(context.Background(), &cmList, client.MatchingLabels{v1alpha1App.AppEntranceCertConfigMapLabel: "true"})
+	if err != nil {
+		return fmt.Errorf("list custom domain cert configmaps err: %v", err)
+	}
+	for _, cm := range cmList.Items {
+		zone := cm.Data[v1alpha1App.AppEntranceCertConfigMapZoneKey]
+		certData := cm.Data[v1alpha1App.AppEntranceCertConfigMapCertKey]
+		keyData := cm.Data[v1alpha1App.AppEntranceCertConfigMapKeyKey]
+		if zone == "" || certData == "" || keyData == "" {
+			klog.Warningf("invalid custom domain config map %s, zone: %s, certData: %s, keyData: %s", cm.Name, zone, certData, keyData)
+			continue
+		}
+		certPath := filepath.Join(nginx.DefNgxSSLCertificationPath, fmt.Sprintf("%s.crt", zone))
+		keyPath := filepath.Join(nginx.DefNgxSSLCertificationPath, fmt.Sprintf("%s.key", zone))
+
+		err := file.WriteFile(certPath, certData, false)
+		if err != nil {
+			return err
+		}
+
+		err = file.WriteFile(keyPath, keyData, false)
+		if err != nil {
+			return err
+		}
+
+		customDomainsWithCert[zone] = customDomainCertPath{certPath: certPath, keyPath: keyPath}
+	}
+	r.customDomainsWithCert = customDomainsWithCert
 	return nil
 }
 

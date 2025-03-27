@@ -244,6 +244,13 @@ func AddContainer(c *restful.Container) error {
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{Data: app_service.ApplicationsSettings{}}))
 
+	ws.Route(ws.GET("/applications/entrances/setup/domain").
+		To(handler.listEntrancesWithCustomDomain).
+		Doc("List application entrances with a custom third party domain set").
+		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", response.Response{Data: app_service.EntrancesWithCustomDomain{}}))
+
 	ws.Route(ws.GET("/applications/{"+ParamAppName+"}/setup/domain").
 		To(handler.getAppCustomDomain).
 		Doc("Get application domain settings").
