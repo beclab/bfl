@@ -28,7 +28,7 @@ func TestCertManager(t *testing.T) {
 	t.Logf("got cert: %v", utils.PrettyJSON(c))
 
 	t.Log("add zone dns record")
-	err = cm.AddDNSRecord(nil, nil, pointer.String("frp-bj.snowinning.com"))
+	err = cm.AddDNSRecord(nil, pointer.String("frp-bj.snowinning.com"))
 	if err != nil {
 		t.Fatal(err)
 	}

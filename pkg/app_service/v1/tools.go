@@ -7,7 +7,6 @@ import (
 
 	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
-	"bytetrade.io/web3os/bfl/pkg/constants"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/emicklei/go-restful/v3"
@@ -50,11 +49,6 @@ func AppUrlGenerator(req *restful.Request, user string) (URLGenerator, error) {
 			klog.Error("get user crd error ", user, err)
 			return nil, err
 		} else {
-			isLocal := req.Attribute(constants.MyAppsIsLocalKey)
-			if isLocalHost(host) || (isLocal != nil && isLocal.(bool)) {
-				zone = "local." + zone
-			}
-
 			if isEphemeral {
 				// Found the new user without zone binding, we need proxy user's apps routes via
 				// the zone of the user's creator.
@@ -152,11 +146,6 @@ func AppUrlGeneratorMultiEntrance(req *restful.Request, user string) (URLGenerat
 			klog.Error("get user crd error ", user, err)
 			return nil, err
 		} else {
-			isLocal := req.Attribute(constants.MyAppsIsLocalKey)
-			if isLocalHost(host) || (isLocal != nil && isLocal.(bool)) {
-				zone = "local." + zone
-			}
-
 			if isEphemeral {
 				// Found the new user without zone binding, we need proxy user's apps routes via
 				// the zone of the user's creator.
@@ -219,17 +208,17 @@ func AppUrlGeneratorMultiEntrance(req *restful.Request, user string) (URLGenerat
 	return appURL, nil
 }
 
-func isLocalHost(host string) bool {
-	hostSplit := strings.Split(host, ".")
-	if len(hostSplit) < 4 {
-		return false
-	}
+// func isLocalHost(host string) bool {
+// 	hostSplit := strings.Split(host, ".")
+// 	if len(hostSplit) < 4 {
+// 		return false
+// 	}
 
-	/*
-	 1. com
-	 2. example
-	 3. user
-	 4. local
-	*/
-	return hostSplit[len(hostSplit)-4] == "local"
-}
+// 	/*
+// 	 1. com
+// 	 2. example
+// 	 3. user
+// 	 4. local
+// 	*/
+// 	return hostSplit[len(hostSplit)-4] == "local"
+// }

@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	"bytetrade.io/web3os/bfl/internal/log"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -9,9 +8,11 @@ import (
 	"net"
 	"net/http"
 	"reflect"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"time"
+
+	"bytetrade.io/web3os/bfl/internal/log"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	appv1alpha1 "bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
@@ -149,7 +150,7 @@ func (conf *ReverseProxyConfig) Check() error {
 func (configurator *ReverseProxyConfigurator) configureDNS(publicIP, localIP, publicCName string) error {
 	var userPatches []func(*iamV1alpha2.User)
 	if publicIP != "" {
-		if err := configurator.cm.AddDNSRecord(&publicIP, nil, nil); err != nil {
+		if err := configurator.cm.AddDNSRecord(&publicIP, nil); err != nil {
 			return errors.Wrap(err, "failed to configure DNS record for public IP")
 		}
 		userPatches = append(userPatches, func(user *iamV1alpha2.User) {
@@ -161,16 +162,13 @@ func (configurator *ReverseProxyConfigurator) configureDNS(publicIP, localIP, pu
 		localIP = natGatewayIP
 	}
 	if localIP != "" {
-		if err := configurator.cm.AddDNSRecord(nil, &localIP, nil); err != nil {
-			return errors.Wrap(err, "failed to configure DNS record for local IP")
-		}
 		userPatches = append(userPatches, func(user *iamV1alpha2.User) {
 			user.Annotations[constants.UserAnnotationLocalDomainIp] = localIP
 			user.Annotations[constants.UserAnnotationLocalDomainDNSRecord] = localIP
 		})
 	}
 	if publicCName != "" {
-		if err := configurator.cm.AddDNSRecord(nil, nil, &publicCName); err != nil {
+		if err := configurator.cm.AddDNSRecord(nil, &publicCName); err != nil {
 			return errors.Wrap(err, "failed to configure DNS record for public CName")
 		}
 		userPatches = append(userPatches, func(user *iamV1alpha2.User) {

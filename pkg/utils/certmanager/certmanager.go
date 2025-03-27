@@ -28,7 +28,7 @@ type Interface interface {
 	DownloadCert() (*ResponseCert, error)
 
 	// AddDNSRecord add dns record, ip or domain
-	AddDNSRecord(publicIP, localIP, domain *string) error
+	AddDNSRecord(publicIP, domain *string) error
 
 	// DeleteDNSRecord delete dns record, delete zone domain record
 	DeleteDNSRecord() error
@@ -120,14 +120,10 @@ func (c *certManager) DownloadCert() (*ResponseCert, error) {
 	return r.Data, nil
 }
 
-func (c *certManager) AddDNSRecord(publicIP, localIP, domain *string) error {
+func (c *certManager) AddDNSRecord(publicIP, domain *string) error {
 	payload := DNSAddPayload{Name: string(c.terminusName)}
 	if publicIP != nil {
 		payload.PublicIP = *publicIP
-	}
-
-	if localIP != nil {
-		payload.LocalIP = *localIP
 	}
 
 	if domain != nil {

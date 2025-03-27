@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	DefNgxBinary               = "/sbin/nginx"
+	DefNgxBinary               = "/usr/local/openresty/bin/openresty"
 	DefNgxCfgPath              = "/etc/nginx/nginx.conf"
 	DefNgxSSLCertificationPath = "/etc/nginx/ssl"
 )
