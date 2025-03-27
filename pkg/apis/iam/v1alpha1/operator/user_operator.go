@@ -105,6 +105,14 @@ func (o *UserOperator) GetTerminusStatus(user *iamV1alpha2.User) string {
 	return o.GetUserAnnotation(user, constants.UserTerminusWizardStatus)
 }
 
+func (o *UserOperator) GetReverseProxyType() (string, error) {
+	user, err := o.GetUser("")
+	if err != nil {
+		return "", err
+	}
+	return o.GetUserAnnotation(user, constants.UserAnnotationReverseProxyType), nil
+}
+
 func (o *UserOperator) GetLoginBackground(user *iamV1alpha2.User) string {
 	b := o.GetUserAnnotation(user, constants.UserLoginBackground)
 	if b == "" {

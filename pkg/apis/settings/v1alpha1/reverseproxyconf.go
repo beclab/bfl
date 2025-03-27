@@ -9,9 +9,11 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"time"
 
+	appv1alpha1 "bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
@@ -35,6 +37,7 @@ import (
 
 type ReverseProxyConfigurator struct {
 	kubeClient   kubernetes.Interface
+	ctrlClient   ctrlclient.Client
 	userOp       *operator.UserOperator
 	cm           certmanager.Interface
 	user         *iamV1alpha2.User
@@ -95,9 +98,17 @@ func NewReverseProxyConfigurator() (*ReverseProxyConfigurator, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get kubernetes client")
 	}
+	controllerClient, err := ctrlclient.New(restConfig, ctrlclient.Options{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get controller client")
+	}
+	if err = appv1alpha1.AddToScheme(controllerClient.Scheme()); err != nil {
+		return nil, errors.Wrap(err, "failed to add apps to scheme")
+	}
 	cm := certmanager.NewCertManager(constants.TerminusName(terminusName))
 	return &ReverseProxyConfigurator{
 		kubeClient:   kubeClient,
+		ctrlClient:   controllerClient,
 		userOp:       userOp,
 		cm:           cm,
 		user:         user,
@@ -231,6 +242,57 @@ func (configurator *ReverseProxyConfigurator) markApplied(ctx context.Context, c
 	return err
 }
 
+func (configurator *ReverseProxyConfigurator) setProxyTypeForRelevantComponents(ctx context.Context, proxyType string) error {
+	if configurator.userOp.GetUserAnnotation(configurator.user, constants.UserAnnotationReverseProxyType) != proxyType {
+		err := configurator.userOp.UpdateAnnotation(configurator.user, constants.UserAnnotationReverseProxyType, proxyType)
+		if err != nil {
+			return errors.Wrap(err, "failed to set reverse proxy type annotation to user")
+		}
+	}
+	appList := &appv1alpha1.ApplicationList{}
+	err := configurator.ctrlClient.List(ctx, appList)
+	if err != nil {
+		return errors.Wrap(err, "failed to list applications")
+	}
+	for _, app := range appList.Items {
+		if app.Spec.Owner != constants.Username {
+			continue
+		}
+		customDomainSettingsStr, ok := app.Spec.Settings[constants.ApplicationCustomDomain]
+		if !ok || customDomainSettingsStr == "" {
+			continue
+		}
+		customDomainSettings := make(map[string]map[string]string)
+		err = json.Unmarshal([]byte(customDomainSettingsStr), &customDomainSettings)
+		if err != nil {
+			log.Errorf("failed to unmarshal custom domain settings of app %s: %w", app.Name, err)
+			continue
+		}
+		for _, entry := range customDomainSettings {
+			// if the app does not have a custom domain, a reverse proxy type switch wouldn't matter
+			if thirdPartyDomain, ok := entry[constants.ApplicationThirdPartyDomain]; !ok || thirdPartyDomain == "" {
+				continue
+			}
+			// if the app has already been synced with the same type of reverse proxy, e.g., a change of the FRP server
+			// no need to sync again
+			if entry[constants.ApplicationReverseProxyType] == proxyType {
+				continue
+			}
+			entry[constants.ApplicationReverseProxyType] = proxyType
+			entry[constants.ApplicationCustomDomainCnameStatus] = constants.CustomDomainCnameStatusPending
+		}
+		customDomainSettingsByte, err := json.Marshal(customDomainSettings)
+		if err != nil {
+			return errors.Wrapf(err, "failed to marshal custom domain settings of app %s", app.Name)
+		}
+		app.Spec.Settings[constants.ApplicationCustomDomain] = string(customDomainSettingsByte)
+		if err := configurator.ctrlClient.Update(ctx, &app); err != nil {
+			return errors.Wrapf(err, "failed to update reverse proxy type to application %s", app.Name)
+		}
+	}
+	return nil
+}
+
 func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context) (err error) {
 	configurator.user, err = configurator.userOp.GetUser("")
 	if err != nil {
@@ -279,8 +341,12 @@ func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context) (er
 		log.Info("current applied reverse proxy config is already the expected one")
 		return nil
 	}
-	var publicIP, localIP, publicCName string
+	var proxyType, publicIP, localIP, publicCName string
 	defer func() {
+		if err != nil {
+			return
+		}
+		err = configurator.setProxyTypeForRelevantComponents(ctx, proxyType)
 		if err != nil {
 			return
 		}
@@ -308,9 +374,8 @@ func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context) (er
 		if err != nil && !apierrors.IsNotFound(err) {
 			return errors.Wrap(err, "failed to delete existing reverse proxy agent")
 		}
-		return errors.Wrap(
-			configurator.userOp.UpdateAnnotation(configurator.user, constants.UserAnnotationReverseProxyType, constants.ReverseProxyTypeNone),
-			"failed to set reverse proxy type annotation to user")
+		proxyType = constants.ReverseProxyTypeNone
+		return nil
 	}
 
 	reverseProxyDeployment := newDefaultReverseProxyAgentDeploymentApplyConfiguration()
@@ -321,9 +386,7 @@ func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context) (er
 			publicCName = conf.FRPServer
 		}
 		setReverseProxyAgentDeploymentToFRP(reverseProxyDeployment, conf.FRPConfig)
-		if err := configurator.userOp.UpdateAnnotation(configurator.user, constants.UserAnnotationReverseProxyType, constants.ReverseProxyTypeFRP); err != nil {
-			return errors.Wrap(err, "failed to set reverse proxy type annotation to user")
-		}
+		proxyType = constants.ReverseProxyTypeFRP
 	} else if conf.EnableCloudFlareTunnel {
 		// get cloudflare token
 		jws := configurator.userOp.GetUserAnnotation(configurator.user, constants.UserCertManagerJWSToken)
@@ -355,9 +418,7 @@ func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context) (er
 			return fmt.Errorf("error response from cloudflare tunnel api: %v", responseData)
 		}
 		setReverseProxyAgentDeploymentToCloudFlare(reverseProxyDeployment, responseData.Data.Token)
-		if err := configurator.userOp.UpdateAnnotation(configurator.user, constants.UserAnnotationReverseProxyType, constants.ReverseProxyTypeCloudflare); err != nil {
-			return errors.Wrap(err, "failed to set reverse proxy type annotation to user")
-		}
+		proxyType = constants.ReverseProxyTypeCloudflare
 	}
 	_, err = configurator.kubeClient.AppsV1().Deployments(constants.Namespace).Apply(ctx,
 		reverseProxyDeployment, metav1.ApplyOptions{Force: true, FieldManager: constants.ApplyPatchFieldManager})
