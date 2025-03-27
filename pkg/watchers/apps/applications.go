@@ -289,11 +289,11 @@ func (s *Subscriber) getStatusByCustomDomainCert(domainName string) (string, err
 func CheckSSLCertificate(cert, key []byte, hostname string) error {
 	block, _ := pem.Decode(cert)
 	if block == nil {
-		return errors.New("certificate is invalid")
+		return errors.New("error decoding certificate PEM block")
 	}
 	pub, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		return errors.New("certificate is invalid")
+		return errors.Wrap(err, "certificate is invalid")
 	}
 	// verify hostname
 	err = pub.VerifyHostname(hostname)

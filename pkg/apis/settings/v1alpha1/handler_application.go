@@ -19,6 +19,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -192,6 +194,11 @@ func (h *Handler) setupAppCustomDomain(req *restful.Request, resp *restful.Respo
 
 	var reqCustomDomain = h.getCustomDomainValue(customDomain, constants.ApplicationThirdPartyDomain)
 	if reqCustomDomain != "" {
+		domainErrs := validation.IsFullyQualifiedDomainName(field.NewPath("domain"), reqCustomDomain)
+		if len(domainErrs) > 0 {
+			response.HandleError(resp, domainErrs.ToAggregate())
+			return
+		}
 		authLevel, err := h.getEntranceAuthLevel(appServiceClient, appName, entranceName, token)
 		if err != nil {
 			response.HandleError(resp, err)
