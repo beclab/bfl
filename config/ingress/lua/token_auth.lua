@@ -121,23 +121,14 @@ end
 
 local function filter_pass(host, user)
     -- for user desktop, no filter
-    local local_zone = "local." .. user.zone
-
     local trust_list = {
         string.format("profile-%s.%s", user.name, user.zone),
-        string.format("profile-%s.%s", user.name, local_zone),
         string.format("wizard-%s.%s", user.name, user.zone),
-        string.format("wizard-%s.%s", user.name, local_zone),
         string.format("desktop-%s.%s", user.name, user.zone),
-        string.format("desktop-%s.%s", user.name, local_zone),
         string.format("desktop.%s", user.zone),
-        string.format("desktop.%s", local_zone),
         string.format("auth-%s.%s", user.name, user.zone),
-        string.format("auth-%s.%s", user.name, local_zone),
         string.format("auth.%s", user.zone),
-        string.format("auth.%s", local_zone),
         user.zone,
-        local_zone,
     }
 
     for _, item in ipairs(trust_list) do
@@ -153,8 +144,7 @@ local function match_user_zone(host, user)
     local prefix = "^([a-zA-Z0-9-]*)(.?)"
 
     local reg = prefix .. user.zone .. "$"
-    local local_reg = prefix .. "local." .. user.zone .. "$"
-    if host:match(reg) or host:match(local_reg) then
+    if host:match(reg) then
         return true
     end
 

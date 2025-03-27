@@ -45,16 +45,14 @@ func (r *NginxController) genNonAppServers(zone string, isEphemeral bool, langua
 	client := analytics.NewClient()
 	for _, app := range nonAppServers {
 		hostname := fmt.Sprintf("%s.%s", app.Name, zone)
-		localHostname := fmt.Sprintf("%s.local.%s", app.Name, zone)
 		if isEphemeral {
 			hostname = fmt.Sprintf("%s-%s.%s", app.Name, constants.Username, zone)
-			localHostname = fmt.Sprintf("%s-%s.local.%s", app.Name, constants.Username, zone)
 		}
 
 		var enableAnalytics bool
 		var analyticsScript string
 
-		if app.AnalyticsEnabled == true {
+		if app.AnalyticsEnabled {
 			resp, err := client.GetAnalyticsID(app.Name, app.Name, constants.Username)
 			if err != nil {
 				klog.Warningf("Failed to get analytics id, %v", err)
@@ -71,7 +69,7 @@ func (r *NginxController) genNonAppServers(zone string, isEphemeral bool, langua
 
 		servers = append(servers, config.Server{
 			Hostname:   hostname,
-			Aliases:    []string{localHostname},
+			Aliases:    []string{},
 			EnableAuth: app.AuthEnabled,
 			EnableSSL:  true,
 			Locations: []config.Location{
@@ -94,7 +92,7 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 
 	profile := config.Server{
 		Hostname:  zone,
-		Aliases:   []string{"local." + zone},
+		Aliases:   []string{},
 		EnableSSL: true,
 		Locations: []config.Location{
 			{
@@ -120,20 +118,17 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 		}
 	}
 
-	formatDomain := func(appLocalDomainName string, customPrefixDomain string) []string {
+	formatDomain := func(customPrefixDomain string) []string {
 		var r []string
-		r = append(r, appLocalDomainName)
 
 		if customPrefixDomain != "" {
 			extAppHostName := fmt.Sprintf("%s.%s", customPrefixDomain, zone)
-			extAppLocalName := fmt.Sprintf("%s.local.%s", customPrefixDomain, zone)
 
 			if isEphemeral {
 				extAppHostName = fmt.Sprintf("%s-%s.%s", customPrefixDomain, constants.Username, zone)
-				extAppLocalName = fmt.Sprintf("%s-%s.local.%s", customPrefixDomain, constants.Username, zone)
 			}
 
-			r = append(r, extAppHostName, extAppLocalName)
+			r = append(r, extAppHostName)
 		}
 		return r
 	}
@@ -142,7 +137,7 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 
 	// add apps servers
 	for _, app := range r.apps {
-		if app.Spec.Entrances == nil || len(app.Spec.Entrances) == 0 {
+		if len(app.Spec.Entrances) == 0 {
 			continue
 		}
 
@@ -172,10 +167,8 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 			klog.Infof("add domain server, app prefix: %q, %s", prefix, utils.ToJSON(app))
 
 			appHostname := fmt.Sprintf("%s.%s", prefix, zone)
-			appLocalName := fmt.Sprintf("%s.local.%s", prefix, zone)
 			if isEphemeral {
 				appHostname = fmt.Sprintf("%s-%s.%s", prefix, constants.Username, zone)
-				appLocalName = fmt.Sprintf("%s-%s.local.%s", prefix, constants.Username, zone)
 			}
 
 			var enableAnalytics bool
@@ -202,7 +195,7 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 
 			s := config.Server{
 				Hostname:   appHostname,
-				Aliases:    formatDomain(appLocalName, customPrefixDomainName),
+				Aliases:    formatDomain(customPrefixDomainName),
 				EnableSSL:  true,
 				EnableAuth: true,
 				Locations: []config.Location{
@@ -224,7 +217,7 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 	// add non application servers
 	_servers := r.genNonAppServers(zone, isEphemeral, language)
 
-	if _servers != nil && len(_servers) > 0 {
+	if len(_servers) > 0 {
 		servers = append(servers, _servers...)
 	}
 

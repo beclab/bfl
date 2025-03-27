@@ -107,7 +107,7 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 		log.Debugf("got current public ip: %s", publicIp)
 
 		if publicIp != publicDomainIp {
-			if err = cm.AddDNSRecord(&publicIp, nil, nil); err != nil {
+			if err = cm.AddDNSRecord(&publicIp, nil); err != nil {
 				return errors.WithStack(err)
 			}
 			userPatches = append(userPatches, func(u *iamV1alpha2.User) {
@@ -119,10 +119,6 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 
 	// nat gateway ip
 	if natGatewayIp != "" && natGatewayIp != localDomainDNSRecord {
-		err := cm.AddDNSRecord(nil, &natGatewayIp, nil)
-		if err != nil {
-			return errors.WithStack(err)
-		}
 		userPatches = append(userPatches, func(u *iamV1alpha2.User) {
 			u.Annotations[constants.UserAnnotationLocalDomainDNSRecord] = natGatewayIp
 		})
@@ -142,14 +138,12 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 		// resolve local domain
 		if natGatewayIp == "" {
 			// non-nat mode
-			err := cm.AddDNSRecord(nil, newLocalIp, nil)
-			if err != nil {
-				return errors.WithStack(err)
-			}
+			userPatches = append(userPatches, func(u *iamV1alpha2.User) {
+				u.Annotations[constants.UserAnnotationLocalDomainDNSRecord] = *newLocalIp
+			})
 		}
 		userPatches = append(userPatches, func(u *iamV1alpha2.User) {
 			u.Annotations[constants.UserAnnotationLocalDomainIp] = *newLocalIp
-			u.Annotations[constants.UserAnnotationLocalDomainDNSRecord] = *newLocalIp
 		})
 
 		log.Infof("resolved new local ip: %s", *newLocalIp)

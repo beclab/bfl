@@ -543,11 +543,9 @@ func buildNonAppServerName(t any, name string) string {
 	}
 
 	out = append(out, fmt.Sprintf("%s.%s", name, tc.UserZone))
-	out = append(out, fmt.Sprintf("%s.local.%s", name, tc.UserZone))
 
 	if tc.IsEphemeralUser {
 		out = append(out, fmt.Sprintf("%s-%s.%s", name, tc.UserName, tc.UserZone))
-		out = append(out, fmt.Sprintf("%s-%s.local.%s", name, tc.UserName, tc.UserZone))
 	}
 	return strings.Join(out, " ")
 }

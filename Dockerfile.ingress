@@ -1,4 +1,4 @@
-FROM golang:1.21.10-bullseye as builder
+FROM golang:1.22.1-bullseye as builder
 
 WORKDIR /workspace
 
@@ -24,7 +24,12 @@ COPY . bytetrade.io/web3os/bfl-ingress/
 RUN cd bytetrade.io/web3os/bfl-ingress/ && \
     CGO_ENABLED=0 go build -ldflags="-s -w" -a -o bfl-ingress cmd/ingress/main.go
 
-FROM bytetrade/nginx:1.24.0
+FROM bytetrade/openresty:1.25.3
+
+RUN apk add --no-cache --virtual .luarocks-deps gcc musl-dev lua5.1-dev coreutils luarocks luarocks5.1
+RUN luarocks-5.1 install lua-resty-cookie 
+RUN apk del .luarocks-deps
+
 WORKDIR /
 COPY --from=builder /workspace/bytetrade.io/web3os/bfl-ingress/bfl-ingress .
 COPY --from=builder /workspace/bytetrade.io/web3os/bfl-ingress/config/ingress/nginx.tmpl /etc/nginx/template/
