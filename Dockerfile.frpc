@@ -22,6 +22,7 @@ RUN cd bytetrade.io/web3os/bfl-frpc && \
 COPY . bytetrade.io/web3os/bfl-frpc/
 
 RUN cd bytetrade.io/web3os/bfl-frpc/ && \
+  go mod tidy && \
   CGO_ENABLED=0 go build -ldflags="-s -w" -a -o frpc-agent cmd/frpc/main.go
 
 FROM beclab/frpc-base:v0.56.2
