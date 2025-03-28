@@ -2,7 +2,7 @@ FROM golang:1.18 as builder
 
 WORKDIR /workspace
 
-ENV ksVersion=v3.3.0
+ENV ksVersion=release-1.11-ext
 
 
 # Copy the Go Modules manifests
