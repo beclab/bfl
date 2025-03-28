@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytetrade.io/web3os/bfl/pkg/constants"
 	"flag"
 	"fmt"
 	"net/url"
@@ -63,6 +64,7 @@ func flags() error {
 	if username == "" {
 		return errors.New("missing flag 'username'")
 	}
+	constants.Username = username
 
 	if authMethod == v1alpha2.FRPAuthMethodToken && authToken == "" {
 		return errors.New("auth method is selected as token but no token is provided")

@@ -1,19 +1,28 @@
 package v1alpha1
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-
+	appv1 "bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/api"
 	"bytetrade.io/web3os/bfl/pkg/api/response"
 	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
+	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/emicklei/go-restful/v3"
 	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
@@ -77,6 +86,73 @@ func (h *Handler) getAppPolicy(req *restful.Request, resp *restful.Response) {
 	response.Success(resp, policy)
 }
 
+func (h *Handler) handleCertConfig(ctx context.Context, customDomain map[string]interface{}) error {
+	cert, key, thirdPartyDomain := customDomain[appv1.AppEntranceCertConfigMapCertKey], customDomain[appv1.AppEntranceCertConfigMapKeyKey], customDomain[constants.ApplicationThirdPartyDomain]
+	if cert == nil || key == nil || thirdPartyDomain == nil {
+		log.Infof("skip storing empty cert config, cert: %s, key: %s, thirdPartyDomain: %s", cert, key, thirdPartyDomain)
+		return nil
+	}
+	var certData, keyData, zoneData string
+	certData, ok := cert.(string)
+	if !ok {
+		return nil
+	}
+	keyData, ok = key.(string)
+	if !ok {
+		return nil
+	}
+	zoneData, ok = thirdPartyDomain.(string)
+	if !ok {
+		return nil
+	}
+	if len(certData) == 0 || len(keyData) == 0 || len(zoneData) == 0 {
+		log.Infof("skip storing empty cert config, cert: %s, key: %s, thirdPartyDomain: %s", cert, key, thirdPartyDomain)
+		return nil
+	}
+	configMapName := fmt.Sprintf(appv1.AppEntranceCertConfigMapNameTpl, zoneData)
+
+	client, err := runtime.NewKubeClientInCluster()
+	if err != nil {
+		return err
+	}
+	err = client.Kubernetes().CoreV1().ConfigMaps(constants.Namespace).Delete(ctx, configMapName, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: constants.Namespace,
+			Labels: map[string]string{
+				appv1.AppEntranceCertConfigMapLabel: "true",
+			},
+		},
+		Data: map[string]string{
+			appv1.AppEntranceCertConfigMapKeyKey:  keyData,
+			appv1.AppEntranceCertConfigMapCertKey: certData,
+			appv1.AppEntranceCertConfigMapZoneKey: zoneData,
+		},
+	}
+	_, err = client.Kubernetes().CoreV1().ConfigMaps(constants.Namespace).Create(ctx, configMap, metav1.CreateOptions{})
+	return err
+}
+
+func (h *Handler) checkCertExists(ctx context.Context, domainName string) error {
+	configMapName := fmt.Sprintf(appv1.AppEntranceCertConfigMapNameTpl, domainName)
+	client, err := runtime.NewKubeClientInCluster()
+	if err != nil {
+		return err
+	}
+	_, err = client.Kubernetes().CoreV1().ConfigMaps(constants.Namespace).Get(ctx, configMapName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return errors.New("current reverse proxy mode is FRP, the HTTPS certificate and key for custom domain must be uploaded")
+		}
+		return fmt.Errorf("failed to check existence of HTTPS cert config map: %v", err)
+	}
+	return nil
+}
+
 func (h *Handler) setupAppCustomDomain(req *restful.Request, resp *restful.Response) {
 	appName := req.PathParameter(ParamAppName)
 	entranceName := req.PathParameter(ParamEntranceName)
@@ -117,6 +193,26 @@ func (h *Handler) setupAppCustomDomain(req *restful.Request, resp *restful.Respo
 	}
 
 	var reqCustomDomain = h.getCustomDomainValue(customDomain, constants.ApplicationThirdPartyDomain)
+	if reqCustomDomain != "" {
+		domainErrs := validation.IsFullyQualifiedDomainName(field.NewPath("domain"), reqCustomDomain)
+		if len(domainErrs) > 0 {
+			response.HandleError(resp, domainErrs.ToAggregate())
+			return
+		}
+		authLevel, err := h.getEntranceAuthLevel(appServiceClient, appName, entranceName, token)
+		if err != nil {
+			response.HandleError(resp, err)
+			return
+		}
+		if authLevel == "private" {
+			response.HandleError(resp, errors.New("custom domain can not be set when auth level is private"))
+			return
+		}
+		if err := h.handleCertConfig(req.Request.Context(), customDomain); err != nil {
+			response.HandleError(resp, err)
+			return
+		}
+	}
 
 	existsAppCustomDomain, err := h.getExistsCustomDomain(appServiceClient, appName, entranceName, token)
 	if err != nil {
@@ -171,6 +267,24 @@ func (h *Handler) setupAppCustomDomain(req *restful.Request, resp *restful.Respo
 	case constants.CustomDomainAdd:
 		formatSettings(customDomain, zone, "", "")
 		if operate == constants.CustomDomainUpdate || operate == constants.CustomDomainAdd {
+			op, err := operator.NewUserOperator()
+			if err != nil {
+				response.HandleError(resp, fmt.Errorf("create user operator failed: %v", err))
+			}
+			reverseProxyType, err := op.GetReverseProxyType()
+			if err != nil {
+				response.HandleError(resp, fmt.Errorf("get reverse proxy type failed: %v", err))
+			}
+			if reverseProxyType == constants.ReverseProxyTypeFRP {
+				err := h.checkCertExists(req.Request.Context(), reqCustomDomain)
+				if err != nil {
+					response.HandleError(resp, err)
+					return
+				}
+			} else {
+				log.Infof("reverse proxy type: %s, skip custom domain cert check", reverseProxyType)
+			}
+			h.setCustomDomainValue(customDomain, constants.ApplicationReverseProxyType, reverseProxyType)
 			h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameTargetStatus, constants.CustomDomainCnameStatusNotset)
 			h.setCustomDomainValue(customDomain, constants.ApplicationCustomDomainCnameStatus, constants.CustomDomainCnameStatusNotset)
 		}
@@ -187,6 +301,63 @@ func (h *Handler) setupAppCustomDomain(req *restful.Request, resp *restful.Respo
 	}
 
 	response.Success(resp, ret)
+	return
+}
+
+func (h *Handler) listEntrancesWithCustomDomain(req *restful.Request, resp *restful.Response) {
+	config, err := ctrl.GetConfig()
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	client, err := ctrlclient.New(config, ctrlclient.Options{})
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	err = appv1.AddToScheme(client.Scheme())
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	appList := &appv1.ApplicationList{}
+	err = client.List(req.Request.Context(), appList)
+	if err != nil {
+		response.HandleError(resp, err)
+		return
+	}
+	var entrances app_service.EntrancesWithCustomDomain
+	for _, app := range appList.Items {
+		if app.Spec.Owner != constants.Username {
+			continue
+		}
+		customDomainSettingsStr, ok := app.Spec.Settings[constants.ApplicationCustomDomain]
+		if !ok || customDomainSettingsStr == "" {
+			continue
+		}
+		customDomainSettings := make(map[string]map[string]string)
+		err = json.Unmarshal([]byte(customDomainSettingsStr), &customDomainSettings)
+		if err != nil {
+			log.Errorf("failed to unmarshal custom domain settings of app %s: %w", app.Name, err)
+			continue
+		}
+		for _, entrance := range app.Spec.Entrances {
+			entranceSetting := customDomainSettings[entrance.Name]
+			if entranceSetting == nil {
+				continue
+			}
+			thirdPartyDomain, ok := entranceSetting[constants.ApplicationThirdPartyDomain]
+			if !ok || thirdPartyDomain == "" {
+				continue
+			}
+			entrances = append(entrances, app_service.EntranceWithCustomDomain{
+				Entrance:     entrance,
+				AppName:      app.Name,
+				CustomDomain: thirdPartyDomain,
+			})
+		}
+	}
+	response.Success(resp, entrances)
 	return
 }
 
@@ -427,6 +598,22 @@ func (h *Handler) getCustomDomainOperation(_reqCustomDomain, _existsAppCustomDom
 	default:
 		return constants.CustomDomainIgnore
 	}
+}
+
+func (h *Handler) getEntranceAuthLevel(appServiceClient *app_service.Client, appName, entranceName, token string) (string, error) {
+	entrances, err := appServiceClient.GetAppEntrances(appName, token)
+	if err != nil {
+		return "", err
+	}
+	var ret string
+	for _, entrance := range entrances {
+		if name, ok := entrance["name"].(string); ok && name == entranceName {
+			if authLevel, ok := entrance["authLevel"].(string); ok {
+				ret = authLevel
+			}
+		}
+	}
+	return ret, nil
 }
 
 func (h *Handler) getExistsCustomDomain(appServiceClient *app_service.Client, appName, entranceName, token string) (string, error) {

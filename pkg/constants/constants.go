@@ -205,6 +205,8 @@ var (
 
 	ApplicationThirdPartyDomain = "third_party_domain"
 
+	ApplicationReverseProxyType = "reverse_proxy_type"
+
 	ApplicationThirdPartyDomainCert = "ssl_config"
 
 	ApplicationThirdPartyDomainCertKeySuffix = "-domain-ssl-config"
@@ -233,14 +235,16 @@ const (
 )
 
 const (
-	CustomDomainCnameStatusEmpty   = ""
-	CustomDomainCnameStatusSet     = "set"     //
-	CustomDomainCnameStatusNotset  = "unset"   // notset
-	CustomDomainCnameStatusPending = "pending" // pending
-	CustomDomainCnameStatusActive  = "active"  // active
-	CustomDomainCnameStatusNone    = "none"    // none
-	CustomDomainCnameStatusTimeout = "timeout" // timeout
-	CustomDomainCnameStatusError   = "error"   // error
+	CustomDomainCnameStatusEmpty        = ""
+	CustomDomainCnameStatusSet          = "set"     //
+	CustomDomainCnameStatusNotset       = "unset"   // notset
+	CustomDomainCnameStatusPending      = "pending" // pending
+	CustomDomainCnameStatusCertNotFound = "cert-not-found"
+	CustomDomainCnameStatusCertInvalid  = "cert-invalid"
+	CustomDomainCnameStatusActive       = "active"  // active
+	CustomDomainCnameStatusNone         = "none"    // none
+	CustomDomainCnameStatusTimeout      = "timeout" // timeout
+	CustomDomainCnameStatusError        = "error"   // error
 )
 
 var SystemReservedKeyWords = []string{
