@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"bytetrade.io/web3os/bfl/pkg/api/response"
@@ -68,7 +69,9 @@ func (h *Handler) doSystemUpgradeFunc(
 		result, err = fn(token, mode == "true")
 	}
 	if err != nil {
-		response.HandleError(resp, err)
+		// when sytem upgrading, app-service may be down, so we need to tell the frontend
+		// with a error status code
+		resp.WriteError(http.StatusNotFound, err)
 		return
 	}
 
