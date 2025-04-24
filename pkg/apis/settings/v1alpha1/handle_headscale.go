@@ -268,10 +268,11 @@ func calTailScaleSubnet() (subnets []string, err error) {
 		return subnets, err
 	}
 	ipAddress := node.Annotations["projectcalico.org/IPv4Address"]
-	_, ipnet, err := net.ParseCIDR(ipAddress)
-	if err != nil {
-		return subnets, err
-	}
+	//_, ipnet, err := net.ParseCIDR(ipAddress)
+	//if err != nil {
+	//	return subnets, err
+	//}
+	ipnet := subtractOneMask(ipAddress)
 	subnets = append(subnets, ipnet.String())
 	return subnets, nil
 }
@@ -383,4 +384,24 @@ func isPortDuplicate(acls []apps.ACL) bool {
 	}
 
 	return false
+}
+
+func subtractOneMask(subnet string) string {
+	_, network, err := net.ParseCIDR(subnet)
+	if err != nil {
+		klog.Errorf("parseCIDR failed: %v", err)
+		return subnet
+	}
+	ones, bits := network.Mask.Size()
+	if ones <= 0 {
+		klog.Infof("network mask ones <=0 ")
+		return subnet
+	}
+	newMask := net.CIDRMask(ones-1, bits)
+	ip := network.IP.Mask(newMask)
+	newCIDR := net.IPNet{
+		IP:   ip,
+		Mask: newMask,
+	}
+	return newCIDR.String()
 }
