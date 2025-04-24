@@ -14,11 +14,8 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/client/dynamic_client/apps"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
-	"github.com/emicklei/go-restful/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
-
-	"k8s.io/klog/v2"
 )
 
 type AclState string
@@ -273,7 +270,7 @@ func calTailScaleSubnet() (subnets []string, err error) {
 	//	return subnets, err
 	//}
 	ipnet := subtractOneMask(ipAddress)
-	subnets = append(subnets, ipnet.String())
+	subnets = append(subnets, ipnet)
 	return subnets, nil
 }
 
