@@ -6,7 +6,7 @@ toolchain go1.22.1
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535
-	github.com/beclab/lldap-client v0.0.5
+	github.com/beclab/lldap-client v0.0.7
 	github.com/cockroachdb/pebble v0.0.0-20221010155749-f122ff497182
 	github.com/emicklei/go-restful v2.14.3+incompatible
 	github.com/emicklei/go-restful-openapi/v2 v2.9.1
