@@ -990,22 +990,8 @@ func (h *Handler) handleDeleteUser(req *restful.Request, resp *restful.Response)
 						log.Warnf("delete userspace %q err, %v", ns, err)
 					}
 
-					//err = iamClient.Users().Delete(taskCtx, name, metav1.DeleteOptions{})
-					lldapClient, err := lldap.New()
-					if err != nil {
-						log.Errorf("make lldap client err=%v", err)
-						return
-					}
-					err = lldapClient.Users().Delete(taskCtx, name)
-					if err != nil {
-						if apierrors.IsNotFound(err) {
-							log.Errorf("delete user: error %v", err)
-							return
-						}
-						log.Errorf("delete user: error %v", err)
-					} else {
-						log.Info("user delete success")
-					}
+					err = iamClient.Users().Delete(taskCtx, name, metav1.DeleteOptions{})
+
 					return
 
 				case <-timeout.C:
