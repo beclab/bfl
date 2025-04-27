@@ -850,7 +850,7 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		}
 
 		//user.Spec.EncryptedPassword = passwordReset.Password
-		err = lldapClient.ResetPassword(ctx, userName, passwordReset.Password)
+		err = lldapClient.Users().ResetPassword(ctx, userName, passwordReset.Password)
 		if err != nil {
 			response.HandleError(resp, errors.Errorf("reset password: set user password err, %v", err))
 			return
