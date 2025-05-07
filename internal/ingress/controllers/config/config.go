@@ -18,6 +18,7 @@ package config
 
 import (
 	"math"
+	"os"
 	"runtime"
 	"strconv"
 	"time"
@@ -75,6 +76,8 @@ const (
 	proxyReadTimeout = "1800s"
 
 	proxySendTimeout = "60s"
+
+	otelAgentLib = "/opt/opentelemetry-webserver/agent/WebServerModule/Nginx/1.25.3/ngx_http_opentelemetry_module.so"
 )
 
 // Configuration represents the content of nginx.conf file
@@ -378,6 +381,8 @@ type Configuration struct {
 	ProxyConnectTimeout string `json:"proxy-connect-timeout"`
 	ProxyReadTimeout    string `json:"proxy-read-timeout"`
 	ProxySendTimeout    string `json:"proxy-send-timeout"`
+
+	EnableOtel bool `json:"enable-otel"`
 }
 
 // NewDefault returns the default nginx configuration
@@ -452,6 +457,7 @@ func NewDefault() Configuration {
 		ProxyConnectTimeout:        proxyConnectTimeout,
 		ProxySendTimeout:           proxySendTimeout,
 		ProxyReadTimeout:           proxyReadTimeout,
+		EnableOtel:                 false,
 	}
 	workerProcesses := int(math.Ceil(float64(runtime.NumCPU() / 2)))
 	if workerProcesses < 1 {
@@ -461,6 +467,10 @@ func NewDefault() Configuration {
 
 	if klog.V(5).Enabled() {
 		cfg.ErrorLogLevel = "debug"
+	}
+
+	if _, err := os.Stat(otelAgentLib); err == nil {
+		cfg.EnableOtel = true
 	}
 
 	return cfg

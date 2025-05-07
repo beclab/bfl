@@ -24,15 +24,17 @@ COPY . bytetrade.io/web3os/bfl-ingress/
 RUN cd bytetrade.io/web3os/bfl-ingress/ && \
     CGO_ENABLED=0 go build -ldflags="-s -w" -a -o bfl-ingress cmd/ingress/main.go
 
-FROM bytetrade/openresty:1.25.3
+FROM bytetrade/openresty:1.25.3-otel
 
-RUN apk add --no-cache --virtual .luarocks-deps gcc musl-dev lua5.1-dev coreutils luarocks luarocks5.1
+RUN apt update && \
+    apt install -y --no-install-recommends gcc lua5.1 coreutils luarocks
 RUN luarocks-5.1 install lua-resty-cookie 
-RUN apk del .luarocks-deps
 
 WORKDIR /
 COPY --from=builder /workspace/bytetrade.io/web3os/bfl-ingress/bfl-ingress .
 COPY --from=builder /workspace/bytetrade.io/web3os/bfl-ingress/config/ingress/nginx.tmpl /etc/nginx/template/
 COPY --from=builder /workspace/bytetrade.io/web3os/bfl-ingress/config/ingress/lua /etc/nginx/lua
+COPY fake-nginx /usr/local/bin/nginx
+RUN chmod 755 /usr/local/bin/nginx
 
 ENTRYPOINT ["/bfl-ingress"]
