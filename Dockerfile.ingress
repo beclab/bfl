@@ -34,5 +34,7 @@ WORKDIR /
 COPY --from=builder /workspace/bytetrade.io/web3os/bfl-ingress/bfl-ingress .
 COPY --from=builder /workspace/bytetrade.io/web3os/bfl-ingress/config/ingress/nginx.tmpl /etc/nginx/template/
 COPY --from=builder /workspace/bytetrade.io/web3os/bfl-ingress/config/ingress/lua /etc/nginx/lua
+COPY fake-nginx /usr/local/bin/nginx
+RUN chmod 755 /usr/local/bin/nginx
 
 ENTRYPOINT ["/bfl-ingress"]

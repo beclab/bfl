@@ -30,6 +30,11 @@
 
 # Configuration checksum: {{ $cfg.Checksum }}
 
+{{ if $cfg.EnableOtel }}
+env OTEL_RESOURCE_ATTRIBUTES;
+load_module /opt/opentelemetry-webserver/agent/WebServerModule/Nginx/1.25.3/ngx_http_opentelemetry_module.so;
+{{ end }}
+
 pid {{ .PID }};
 
 daemon on;
@@ -491,6 +496,8 @@ http {
             return 404;
         }
     }
+
+    include /etc/nginx/conf.d/*.conf;
 }
 
 {{ if gt (len .StreamServers) 0 }}
