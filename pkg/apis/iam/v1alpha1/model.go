@@ -35,6 +35,7 @@ type UserInfo struct {
 type LoginRecord struct {
 	Type      string `json:"type"`
 	Success   bool   `json:"success"`
+	SourceIP  string `json:"sourceIP"`
 	UserAgent string `json:"user_agent"`
 	Reason    string `json:"reason"`
 	LoginTime *int64 `json:"login_time"`
