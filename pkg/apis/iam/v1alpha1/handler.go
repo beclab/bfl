@@ -702,6 +702,7 @@ func (h *Handler) handleListUserLoginRecords(req *restful.Request, resp *restful
 			Success:   r.Success,
 			UserAgent: r.UserAgent,
 			Reason:    r.Reason,
+			SourceIP:  r.SourceIp,
 			LoginTime: func() *int64 {
 				t := r.CreationDate.Unix()
 				return &t
@@ -991,6 +992,9 @@ func (h *Handler) handleDeleteUser(req *restful.Request, resp *restful.Response)
 					}
 
 					err = iamClient.Users().Delete(taskCtx, name, metav1.DeleteOptions{})
+					if err != nil {
+						log.Warnf("delete user %q err, %v", name, err)
+					}
 
 					return
 
