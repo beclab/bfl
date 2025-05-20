@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -39,11 +38,11 @@ var GVR = schema.GroupVersionResource{
 type Subscriber struct {
 	*watchers.Subscriber
 	client        clientset.Client
-	dynamicClient *dynamic_client.ResourceDynamicClient
+	dynamicClient *dynamic_client.ResourceClient[appv1.Application]
 }
 
 func (s *Subscriber) WithKubeConfig(config *rest.Config) *Subscriber {
-	s.dynamicClient = dynamic_client.NewResourceDynamicClientOrDie().GroupVersionResource(GVR)
+	s.dynamicClient = dynamic_client.NewResourceClientOrDie[appv1.Application](GVR)
 	s.client, _ = clientset.NewKubeClient(config)
 	return s
 }
@@ -197,19 +196,7 @@ func (s *Subscriber) checkCustomDomainStatus(app *appv1.Application) error {
 func (s *Subscriber) updateApp(app *appv1.Application) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	ab, err := json.Marshal(app)
-	if err != nil {
-		klog.Errorf("update app marshal app error %+v, app: %s", err, app.GetName())
-		return nil
-	}
-	var obj = make(map[string]interface{})
-	err = json.Unmarshal(ab, &obj)
-	if err != nil {
-		klog.Errorf("update app unmarshal app error %+v, app: %s", err, app.GetName())
-		return nil
-	}
-
-	err = s.dynamicClient.Update(ctx, &unstructured.Unstructured{Object: obj}, metav1.UpdateOptions{}, app)
+	_, err := s.dynamicClient.Update(ctx, app, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -445,12 +432,7 @@ func (s *Subscriber) getReverseProxyType() (string, error) {
 }
 
 func (s *Subscriber) getObj(appName string) (*appv1.Application, error) {
-	var app appv1.Application
-
-	if err := s.dynamicClient.Get(context.Background(), appName, metav1.GetOptions{}, &app); err != nil {
-		return nil, err
-	}
-	return &app, nil
+	return s.dynamicClient.Get(context.Background(), appName, metav1.GetOptions{})
 }
 
 func (s *Subscriber) isOwnerApp(owner string) bool {

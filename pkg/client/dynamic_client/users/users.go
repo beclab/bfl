@@ -18,20 +18,23 @@ var gvr = schema.GroupVersionResource{
 }
 
 type ResourceUserClient struct {
-	c *dynamic_client.ResourceDynamicClient
+	c *dynamic_client.ResourceClient[iamV1alpha2.User]
 }
 
 func NewResourceUserClient() (*ResourceUserClient, error) {
-	ri, err := dynamic_client.NewResourceDynamicClient()
+	ri, err := dynamic_client.NewResourceClient[iamV1alpha2.User](gvr)
 	if err != nil {
 		return nil, err
 	}
-	return &ResourceUserClient{c: ri.GroupVersionResource(gvr)}, nil
+	return &ResourceUserClient{c: ri}, nil
 }
 
 func NewResourceUserClientOrDie() *ResourceUserClient {
-	ri := dynamic_client.NewResourceDynamicClientOrDie()
-	return &ResourceUserClient{c: ri.GroupVersionResource(gvr)}
+	c, err := NewResourceUserClient()
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 func (u *ResourceUserClient) Create(ctx context.Context, user iamV1alpha2.User, options metav1.CreateOptions) (*iamV1alpha2.User, error) {
@@ -52,35 +55,13 @@ func (u *ResourceUserClient) Delete(ctx context.Context, name string, options me
 }
 
 func (u *ResourceUserClient) Update(ctx context.Context, user *iamV1alpha2.User, options metav1.UpdateOptions) (*iamV1alpha2.User, error) {
-	obj, err := dynamic_client.ToUnstructured(user)
-	if err != nil {
-		return nil, err
-	}
-
-	err = u.c.Update(ctx, &unstructured.Unstructured{Object: obj}, options, user)
-	return user, err
+	return u.c.Update(ctx, user, options)
 }
 
 func (u *ResourceUserClient) List(ctx context.Context, options metav1.ListOptions) ([]*iamV1alpha2.User, error) {
-	userList, err := u.c.List(ctx, options, &iamV1alpha2.User{})
-	if err != nil {
-		return nil, err
-	}
-
-	var users []*iamV1alpha2.User
-
-	for _, user := range userList {
-		users = append(users, user.(*iamV1alpha2.User))
-	}
-	return users, nil
+	return u.c.List(ctx, options)
 }
 
 func (u *ResourceUserClient) Get(ctx context.Context, name string, options metav1.GetOptions) (*iamV1alpha2.User, error) {
-	var user iamV1alpha2.User
-
-	err := u.c.Get(ctx, name, options, &user)
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
+	return u.c.Get(ctx, name, options)
 }
