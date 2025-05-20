@@ -189,7 +189,7 @@ func (h *Handler) setHeadscaleAcl(req *restful.Request, resp *restful.Response, 
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 
-		client, err := dynamic_client.NewResourceClient[apps.Application, apps.ApplicationList](apps.ApplicationGvr)
+		client, err := dynamic_client.NewResourceClient[apps.Application](apps.ApplicationGvr)
 		if err != nil {
 			klog.Error("failed to get client: ", err)
 			return err
@@ -218,7 +218,7 @@ func (h *Handler) setHeadscaleAcl(req *restful.Request, resp *restful.Response, 
 }
 
 func (h *Handler) findApp(ctx context.Context, appName string) (*apps.Application, error) {
-	client, err := dynamic_client.NewResourceClient[apps.Application, apps.ApplicationList](apps.ApplicationGvr)
+	client, err := dynamic_client.NewResourceClient[apps.Application](apps.ApplicationGvr)
 	if err != nil {
 		klog.Error("failed to get client: ", err)
 		return nil, err
@@ -232,7 +232,7 @@ func (h *Handler) findApp(ctx context.Context, appName string) (*apps.Applicatio
 
 	for _, a := range apps {
 		if a.Spec.Name == appName && a.Spec.Owner == constants.Username {
-			return &a, nil
+			return a, nil
 		}
 	}
 
@@ -310,7 +310,7 @@ func (h *Handler) setTailScaleSubRoutes(req *restful.Request, resp *restful.Resp
 		return
 	}
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		client, err := dynamic_client.NewResourceClient[apps.Application, apps.ApplicationList](apps.ApplicationGvr)
+		client, err := dynamic_client.NewResourceClient[apps.Application](apps.ApplicationGvr)
 		if err != nil {
 			klog.Error("failed to get client: ", err)
 			return err
@@ -332,8 +332,8 @@ func (h *Handler) setTailScaleSubRoutes(req *restful.Request, resp *restful.Resp
 	response.SuccessNoData(resp)
 }
 
-func (h *Handler) appList(ctx context.Context) ([]apps.Application, error) {
-	client, err := dynamic_client.NewResourceClient[apps.Application, apps.ApplicationList](apps.ApplicationGvr)
+func (h *Handler) appList(ctx context.Context) ([]*apps.Application, error) {
+	client, err := dynamic_client.NewResourceClient[apps.Application](apps.ApplicationGvr)
 	if err != nil {
 		klog.Error("failed to get client: ", err)
 		return nil, err
@@ -344,7 +344,7 @@ func (h *Handler) appList(ctx context.Context) ([]apps.Application, error) {
 		klog.Error("list app error: ", err)
 		return nil, err
 	}
-	filteredApps := make([]apps.Application, 0)
+	filteredApps := make([]*apps.Application, 0)
 	for _, a := range appList {
 		if a.Spec.Owner != constants.Username {
 			continue

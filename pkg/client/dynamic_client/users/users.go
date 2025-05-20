@@ -61,19 +61,16 @@ func (u *ResourceUserClient) Update(ctx context.Context, user *iamV1alpha2.User,
 	return user, err
 }
 
-func (u *ResourceUserClient) List(ctx context.Context, options metav1.ListOptions) ([]iamV1alpha2.User, error) {
-	var userList iamV1alpha2.UserList
-
-	err := u.c.List(ctx, options, &userList)
+func (u *ResourceUserClient) List(ctx context.Context, options metav1.ListOptions) ([]*iamV1alpha2.User, error) {
+	userList, err := u.c.List(ctx, options, &iamV1alpha2.User{})
 	if err != nil {
 		return nil, err
 	}
 
-	var users []iamV1alpha2.User
+	var users []*iamV1alpha2.User
 
-	for _, user := range userList.Items {
-		user := user
-		users = append(users, user)
+	for _, user := range userList {
+		users = append(users, user.(*iamV1alpha2.User))
 	}
 	return users, nil
 }

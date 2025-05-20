@@ -8,23 +8,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type resourceList[T any] interface {
-	GetItems() []T
-}
-
-type resourceClient[T any, TL resourceList[T]] struct {
+type resourceClient[T any] struct {
 	c *ResourceDynamicClient
 }
 
-func NewResourceClient[T any, TL resourceList[T]](gvr schema.GroupVersionResource) (*resourceClient[T, TL], error) {
+func NewResourceClient[T any](gvr schema.GroupVersionResource) (*resourceClient[T], error) {
 	ri, err := NewResourceDynamicClient()
 	if err != nil {
 		return nil, err
 	}
-	return &resourceClient[T, TL]{c: ri.GroupVersionResource(gvr)}, nil
+	return &resourceClient[T]{c: ri.GroupVersionResource(gvr)}, nil
 }
 
-func (u *resourceClient[T, TL]) Get(ctx context.Context, name string, options metav1.GetOptions) (*T, error) {
+func (u *resourceClient[T]) Get(ctx context.Context, name string, options metav1.GetOptions) (*T, error) {
 	var resource T
 
 	err := u.c.Get(ctx, name, options, &resource)
@@ -34,24 +30,22 @@ func (u *resourceClient[T, TL]) Get(ctx context.Context, name string, options me
 	return &resource, nil
 }
 
-func (u *resourceClient[T, TL]) List(ctx context.Context, options metav1.ListOptions) ([]T, error) {
-	var resourceList TL
-
-	err := u.c.List(ctx, options, &resourceList)
+func (u *resourceClient[T]) List(ctx context.Context, options metav1.ListOptions) ([]*T, error) {
+	var r T
+	resources, err := u.c.List(ctx, options, &r)
 	if err != nil {
 		return nil, err
 	}
 
-	var resources []T
-
-	for _, r := range resourceList.GetItems() {
-		resources = append(resources, r)
+	var ret []*T
+	for _, r := range resources {
+		ret = append(ret, r.(*T))
 	}
 
-	return resources, nil
+	return ret, nil
 }
 
-func (u *resourceClient[T, TL]) Update(ctx context.Context, resource *T, options metav1.UpdateOptions) (*T, error) {
+func (u *resourceClient[T]) Update(ctx context.Context, resource *T, options metav1.UpdateOptions) (*T, error) {
 	obj, err := ToUnstructured(resource)
 	if err != nil {
 		return nil, err
