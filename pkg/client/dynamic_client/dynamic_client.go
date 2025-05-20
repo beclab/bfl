@@ -8,30 +8,33 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/informers"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var syncOnce sync.Once
 
-type ResourceDynamicClient struct {
+type resourceDynamicClient struct {
 	namespace string
 	gvr       schema.GroupVersionResource
 	c         dynamic.Interface
+	informer  informers.GenericInformer
 }
 
-var resourceInterface *ResourceDynamicClient
+var resourceInformerFactory dynamicinformer.DynamicSharedInformerFactory
+var clientCtx context.Context
 
 func init() {
 	syncOnce.Do(func() {
-		client, err := NewResourceDynamicClient()
-		if err != nil {
-			panic(err)
-		}
-		resourceInterface = client
+		config := ctrl.GetConfigOrDie()
+		client := dynamic.NewForConfigOrDie(config)
+		resourceInformerFactory = dynamicinformer.NewDynamicSharedInformerFactory(client, 0)
+		clientCtx = context.Background()
 	})
 }
 
-func NewResourceDynamicClient() (*ResourceDynamicClient, error) {
+func newResourceDynamicClient() (*resourceDynamicClient, error) {
 	config, err := ctrl.GetConfig()
 	if err != nil {
 		return nil, err
@@ -41,43 +44,35 @@ func NewResourceDynamicClient() (*ResourceDynamicClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ResourceDynamicClient{c: client}, nil
+	return &resourceDynamicClient{c: client}, nil
 }
 
-func NewResourceDynamicClientOrDie() *ResourceDynamicClient {
-	config, err := ctrl.GetConfig()
-	if err != nil {
-		panic(err)
-	}
-
-	client, err := dynamic.NewForConfig(config)
-	if err != nil {
-		panic(err)
-	}
-	return &ResourceDynamicClient{c: client}
+func (r *resourceDynamicClient) Namespace(ns string) *resourceDynamicClient {
+	r.namespace = ns
+	return r
 }
 
-func (r *ResourceDynamicClient) Namespace(ns string) *ResourceDynamicClient {
-	ret := *r
-	ret.namespace = ns
-	return &ret
+func (r *resourceDynamicClient) GroupVersionResource(gvr schema.GroupVersionResource) *resourceDynamicClient {
+	r.gvr = gvr
+	r.informer = resourceInformerFactory.ForResource(gvr)
+
+	// add a new resource informer, start to sync cache
+	// factory will not start syncing duplicately
+	resourceInformerFactory.Start(clientCtx.Done())
+	resourceInformerFactory.WaitForCacheSync(clientCtx.Done())
+
+	return r
 }
 
-func (r *ResourceDynamicClient) GroupVersionResource(gvr schema.GroupVersionResource) *ResourceDynamicClient {
-	ret := *r
-	ret.gvr = gvr
-	return &ret
-}
-
-func (r *ResourceDynamicClient) unmarshal(v map[string]any, obj any) error {
+func (r *resourceDynamicClient) unmarshal(v map[string]any, obj any) error {
 	return UnstructuredConverter.FromUnstructured(v, obj)
 }
 
-func (r *ResourceDynamicClient) Delete(ctx context.Context, name string, options metav1.DeleteOptions) error {
+func (r *resourceDynamicClient) Delete(ctx context.Context, name string, options metav1.DeleteOptions) error {
 	return r.c.Resource(r.gvr).Namespace(r.namespace).Delete(ctx, name, options)
 }
 
-func (r *ResourceDynamicClient) Create(ctx context.Context, obj *unstructured.Unstructured, options metav1.CreateOptions, v any) error {
+func (r *resourceDynamicClient) Create(ctx context.Context, obj *unstructured.Unstructured, options metav1.CreateOptions, v any) error {
 	data, err := r.c.Resource(r.gvr).Namespace(r.namespace).Create(ctx, obj, options)
 	if err != nil {
 		return err
@@ -85,27 +80,11 @@ func (r *ResourceDynamicClient) Create(ctx context.Context, obj *unstructured.Un
 	return r.unmarshal(data.UnstructuredContent(), v)
 }
 
-func (r *ResourceDynamicClient) Update(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, v any) error {
+func (r *resourceDynamicClient) update(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, v any) error {
 	data, err := r.c.Resource(r.gvr).Namespace(r.namespace).Update(ctx, obj, options)
 	if err != nil {
 		return err
 	}
 
-	return r.unmarshal(data.UnstructuredContent(), v)
-}
-
-func (r *ResourceDynamicClient) Get(ctx context.Context, name string, options metav1.GetOptions, v any) error {
-	data, err := r.c.Resource(r.gvr).Namespace(r.namespace).Get(ctx, name, options)
-	if err != nil {
-		return err
-	}
-	return r.unmarshal(data.UnstructuredContent(), v)
-}
-
-func (r *ResourceDynamicClient) List(ctx context.Context, options metav1.ListOptions, v any) error {
-	data, err := r.c.Resource(r.gvr).Namespace(r.namespace).List(ctx, options)
-	if err != nil {
-		return err
-	}
 	return r.unmarshal(data.UnstructuredContent(), v)
 }

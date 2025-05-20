@@ -93,23 +93,17 @@ const SettingsSelfhostedKey = "selfhosted"
 const SettingsTerminusdKey = "terminusd"
 
 type ResourceTerminusClient struct {
-	c *dynamic_client.ResourceDynamicClient
+	c *dynamic_client.ResourceClient[Terminus]
 }
 
 func NewResourceTerminusClient() (*ResourceTerminusClient, error) {
-	ri, err := dynamic_client.NewResourceDynamicClient()
+	ri, err := dynamic_client.NewResourceClient[Terminus](terminusGvr)
 	if err != nil {
 		return nil, err
 	}
-	return &ResourceTerminusClient{c: ri.GroupVersionResource(terminusGvr)}, nil
+	return &ResourceTerminusClient{c: ri}, nil
 }
 
 func (u *ResourceTerminusClient) Get(ctx context.Context, name string, options metav1.GetOptions) (*Terminus, error) {
-	var terminus Terminus
-
-	err := u.c.Get(ctx, name, options, &terminus)
-	if err != nil {
-		return nil, err
-	}
-	return &terminus, nil
+	return u.c.Get(ctx, name, options)
 }

@@ -56,7 +56,7 @@ func NewUserOperatorOrDie() *UserOperator {
 	}
 }
 
-func (o *UserOperator) ListUsers() ([]iamV1alpha2.User, error) {
+func (o *UserOperator) ListUsers() ([]*iamV1alpha2.User, error) {
 	_users, err := o.client.List(o.ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
