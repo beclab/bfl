@@ -43,6 +43,12 @@ func AddContainer(c *restful.Container) error {
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{}))
 
+	ws.Route(ws.GET("/olares-info").
+		To(handler.handleOlaresInfo).
+		Doc("olares information.").
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", response.Response{}))
+
 	ws.Route(ws.GET("/ip").
 		To(handler.handleGetIPAddress).
 		Doc("IP Address.").
@@ -84,6 +90,12 @@ func AddContainer(c *restful.Container) error {
 	wsWizard.Route(wsWizard.GET("/terminus-info").
 		To(handler.handleTerminusInfo).
 		Doc("terminus information.").
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(http.StatusOK, "", response.Response{}))
+
+	wsWizard.Route(wsWizard.GET("/olares-info").
+		To(handler.handleOlaresInfo).
+		Doc("olares information.").
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{}))
 

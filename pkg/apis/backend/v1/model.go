@@ -27,6 +27,7 @@ type IPAddress struct {
 	MasterExternalIP string `json:"masterExternalIP"`
 }
 
+// Depreacted
 type TerminusInfo struct {
 	TerminusName    string                 `json:"terminusName"`
 	WizardStatus    constants.WizardStatus `json:"wizardStatus"`
@@ -39,6 +40,20 @@ type TerminusInfo struct {
 	UserDID         string                 `json:"did"`
 	ReverseProxy    string                 `json:"reverseProxy"`
 	Terminusd       string                 `json:"terminusd"`
+}
+
+type OlaresInfo struct {
+	OlaresName      string                 `json:"olaresName"`
+	WizardStatus    constants.WizardStatus `json:"wizardStatus"`
+	Selfhosted      bool                   `json:"selfhosted"`
+	TailScaleEnable bool                   `json:"tailScaleEnable"`
+	OsVersion       string                 `json:"osVersion"`
+	LoginBackground string                 `json:"loginBackground"`
+	Avatar          string                 `json:"avatar"`
+	OlaresID        string                 `json:"olaresId"`
+	UserDID         string                 `json:"did"`
+	ReverseProxy    string                 `json:"reverseProxy"`
+	Olaresd         string                 `json:"olaresd"`
 }
 
 type MyAppsParam struct {
