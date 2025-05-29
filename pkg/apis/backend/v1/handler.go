@@ -317,6 +317,7 @@ func (h *Handler) handleReDownloadCert(req *restful.Request, resp *restful.Respo
 	response.SuccessNoData(resp)
 }
 
+// Deprecated: use handleOlaresInfo instead
 func (h *Handler) handleTerminusInfo(req *restful.Request, resp *restful.Response) {
 
 	userOp, err := operator.NewUserOperator()
@@ -362,6 +363,72 @@ func (h *Handler) handleTerminusInfo(req *restful.Request, resp *restful.Respons
 	}
 
 	tInfo.TerminusID = terminusId
+
+	var denyAllAnno string = userOp.GetDenyAllPolicy(user)
+	if denyAllAnno == "" {
+		tInfo.TailScaleEnable = false
+	} else {
+		denyAll, _ := strconv.Atoi(denyAllAnno)
+		tInfo.TailScaleEnable = denyAll == 1
+	}
+
+	tInfo.LoginBackground = userOp.GetLoginBackground(user)
+	tInfo.Avatar = userOp.GetAvatar(user)
+	tInfo.UserDID = userOp.GetUserDID(user)
+
+	if reverseProxy := userOp.GetUserAnnotation(user, constants.UserAnnotationReverseProxyType); reverseProxy != "" {
+		tInfo.ReverseProxy = reverseProxy
+	}
+
+	response.Success(resp, tInfo)
+
+}
+
+func (h *Handler) handleOlaresInfo(req *restful.Request, resp *restful.Response) {
+
+	userOp, err := operator.NewUserOperator()
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("olares info: new user operator err: %v", err))
+		return
+	}
+
+	user, err := userOp.GetUser("")
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("olares info: get user err: %v", err))
+		return
+	}
+
+	tInfo := OlaresInfo{}
+	tInfo.OlaresName = userOp.GetTerminusName(user)
+
+	status := userOp.GetTerminusStatus(user)
+	if status == "" {
+		tInfo.WizardStatus = constants.WaitActivateVault
+	} else {
+		tInfo.WizardStatus = constants.WizardStatus(status)
+	}
+
+	selfhosted, terminusd, osVersion, err := userOp.SelfhostedAndOsVersion()
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("olares info: get olares host type err: %v", err))
+		return
+	}
+
+	tInfo.Selfhosted = selfhosted
+	tInfo.OsVersion = osVersion
+
+	tInfo.Olaresd = "0"
+	if terminusd {
+		tInfo.Olaresd = "1"
+	}
+
+	terminusId, err := userOp.GetTerminusID()
+	if err != nil {
+		response.HandleError(resp, errors.Errorf("olares info: get olares id err: %v", err))
+		return
+	}
+
+	tInfo.OlaresID = terminusId
 
 	var denyAllAnno string = userOp.GetDenyAllPolicy(user)
 	if denyAllAnno == "" {
