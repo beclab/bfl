@@ -58,16 +58,21 @@ const (
 	AppServicePortEnv = "APP_SERVICE_SERVICE_PORT"
 )
 
-func NewAppServiceClient() *Client {
+var appServiceClient *Client
+
+func init() {
 	transport := &http.Transport{
 		MaxIdleConnsPerHost: 50,
 	}
-	c := &Client{
+
+	appServiceClient = &Client{
 		httpClient: &http.Client{Timeout: time.Second * 5,
 			Transport: transport},
 	}
+}
 
-	return c
+func NewAppServiceClient() *Client {
+	return appServiceClient
 }
 
 func (c *Client) GetAppInfo(appname, token string) (*AppInfo, error) {

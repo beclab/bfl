@@ -1,6 +1,12 @@
 package v1alpha1
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+
 	appv1 "bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/api"
@@ -11,11 +17,6 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +26,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/emicklei/go-restful/v3"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 )
 
@@ -310,7 +312,7 @@ func (h *Handler) listEntrancesWithCustomDomain(req *restful.Request, resp *rest
 		response.HandleError(resp, err)
 		return
 	}
-	client, err := ctrlclient.New(config, ctrlclient.Options{})
+	client, err := ctrlclient.New(config, ctrlclient.Options{Scheme: k8sruntime.NewScheme()})
 	if err != nil {
 		response.HandleError(resp, err)
 		return
