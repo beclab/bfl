@@ -33,13 +33,13 @@ func AddToContainer(c *restful.Container, addCallback func(func() error, func() 
 		Produces(restful.MIME_JSON).
 		Returns(http.StatusOK, "", response.Response{}))*/
 	//
-	//ws.Route(ws.POST("/refresh-token").
-	//	To(handler.handleRefreshToken).
-	//	Doc("Refresh JWT token.").
-	//	Metadata(restfulspec.KeyOpenAPITags, iamTags).
-	//	Reads(PostRefreshToken{}, "Refresh Token").
-	//	Produces(restful.MIME_JSON).
-	//	Returns(http.StatusOK, "", response.Response{}))
+	ws.Route(ws.POST("/refresh-token").
+		To(handler.handleRefreshToken).
+		Doc("Refresh JWT token.").
+		Metadata(restfulspec.KeyOpenAPITags, iamTags).
+		Reads(PostRefreshToken{}, "Refresh Token").
+		Produces(restful.MIME_JSON).
+		Returns(http.StatusOK, "", response.Response{}))
 	//
 	//ws.Route(ws.POST("/logout").
 	//	To(handler.handleUserLogOut).
