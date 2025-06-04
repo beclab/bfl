@@ -134,24 +134,18 @@ func (h *Handler) handleRefreshToken(req *restful.Request, resp *restful.Respons
 
 	log.Infow("refresh token, read input", "refreshToken", pt)
 
-	data := map[string]string{
-		"grant_type":    "refresh_token",
-		"refresh_token": pt.Token,
-		"client_id":     constants.KubeSphereClientID,
-		"client_secret": constants.KubeSphereClientSecret,
-	}
-
-	token, code, err := RequestToken(pt.Token, data)
+	newToken, err := auth.Refresh("http://lldap-service.os-system:17170", pt.Token)
 	if err != nil {
 		resp.WriteHeaderAndEntity(http.StatusOK, response.Header{
-			Code:    code,
+			Code:    -1,
 			Message: err.Error(),
 		})
 		return
 	}
-	log.Infow("refresh token: generated new", "accessToken", token)
 
-	response.Success(resp, token)
+	log.Infow("refresh token: generated new", "accessToken", newToken)
+
+	response.Success(resp, newToken)
 }
 
 func (h *Handler) handleUserLogOut(req *restful.Request, resp *restful.Response) {
