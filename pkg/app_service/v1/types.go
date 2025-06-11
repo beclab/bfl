@@ -22,6 +22,7 @@ type AppInfo struct {
 	TailScaleACLs   []ACL         `json:"tailscaleAcls,omitempty"`
 	State           string        `json:"state"`
 	IsSysApp        bool          `json:"isSysApp"`
+	RequiredGpu     string        `json:"requiredGpu"`
 	IsClusterScoped bool          `json:"isClusterScoped"`
 	MobileSupported bool          `json:"mobileSupported"`
 }
