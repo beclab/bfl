@@ -56,7 +56,7 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 		isSysApp := appSpec["isSysApp"].(bool)
 
 		// get app settings to filter system service not to list
-		title, target, state := "", "", ""
+		var title, target, state, requiredGPU string
 		isClusterScoped, mobileSupported := false, false
 		settings, ok := appSpec["settings"]
 		if ok {
@@ -79,6 +79,9 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 			}
 			if t, ok := settingsMap["mobileSupported"]; ok && t == "true" {
 				mobileSupported = true
+			}
+			if t, ok := settingsMap["requiredGPU"]; ok {
+				requiredGPU = t.(string)
 			}
 		}
 
@@ -215,6 +218,7 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 			IsSysApp:        isSysApp,
 			IsClusterScoped: isClusterScoped,
 			MobileSupported: mobileSupported,
+			RequiredGpu:     requiredGPU,
 		})
 
 	}
