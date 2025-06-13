@@ -548,7 +548,8 @@ func (conf *ReverseProxyConfig) generateReverseProxyConfigMapData() map[string]s
 }
 
 func GetDefaultReverseProxyConfig(ctx context.Context) (*ReverseProxyConfig, error) {
-	configData, err := k8sutil.GetConfigMapData(ctx, constants.OSSystemNamespace, constants.DefaultReverseProxyConfigMapName)
+	namespace := utils.EnvOrDefault("L4_PROXY_NAMESPACE", constants.OSSystemNamespace)
+	configData, err := k8sutil.GetConfigMapData(ctx, namespace, constants.DefaultReverseProxyConfigMapName)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting configmap")
 	}

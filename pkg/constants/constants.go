@@ -131,7 +131,7 @@ var (
 	// this port must be used to proxy traffic
 	L4ListenSSLProxyProtocolPort = "444"
 
-	OSSystemNamespace = "os-system" // "kubesphere-system"
+	OSSystemNamespace = "os-network" // "kubesphere-system"
 
 	L4ProxyServiceAccountName = "os-internal" // "kubesphere"
 

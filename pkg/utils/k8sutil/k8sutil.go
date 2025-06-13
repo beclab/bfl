@@ -3,10 +3,11 @@ package k8sutil
 import (
 	"context"
 	"fmt"
-	applyCorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	applyMetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"net"
 	"time"
+
+	applyCorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	applyMetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
@@ -23,7 +24,8 @@ import (
 )
 
 func GetL4ProxyNodeIP(ctx context.Context, waitTimeout time.Duration) (*string, error) {
-	return GetPodHostIPWithLabelSelector(ctx, waitTimeout, constants.OSSystemNamespace, "app=l4-bfl-proxy")
+	namespace := utils.EnvOrDefault("L4_PROXY_NAMESPACE", constants.OSSystemNamespace)
+	return GetPodHostIPWithLabelSelector(ctx, waitTimeout, namespace, "app=l4-bfl-proxy")
 }
 
 func GetPodHostIPWithLabelSelector(ctx context.Context, waitTimeout time.Duration, namespace, labelSelector string) (*string, error) {
