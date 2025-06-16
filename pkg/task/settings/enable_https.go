@@ -213,7 +213,7 @@ func (t *EnableHTTPSTask) newApplyDownloadCertCronJob(expiredAt string) error {
 	cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers = []applyCorev1.ContainerApplyConfiguration{
 		{
 			Name:  pointer.String("trigger"),
-			Image: pointer.String("busybox:latest"),
+			Image: pointer.String("busybox:1.28"),
 			Command: []string{
 				"wget",
 				"--header",
