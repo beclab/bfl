@@ -73,7 +73,7 @@ func New() (*APIServer, error) {
 }
 
 func (s *APIServer) initFetchKsJwtKey() error {
-	secret, err := s.kubeClient.Kubernetes().CoreV1().Secrets("os-framework").Get(context.TODO(), "lldap-credentials", metav1.GetOptions{})
+	secret, err := s.kubeClient.Kubernetes().CoreV1().Secrets("os-platform").Get(context.TODO(), "lldap-credentials", metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
