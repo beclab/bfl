@@ -134,7 +134,7 @@ func (h *Handler) handleRefreshToken(req *restful.Request, resp *restful.Respons
 
 	log.Infow("refresh token, read input", "refreshToken", pt)
 
-	newToken, err := auth.Refresh("http://lldap-service.os-system:17170", pt.Token)
+	newToken, err := auth.Refresh("http://lldap-service.os-framework:17170", pt.Token)
 	if err != nil {
 		resp.WriteHeaderAndEntity(http.StatusOK, response.Header{
 			Code:    -1,
@@ -756,7 +756,7 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 
 		if len(passwordReset.CurrentPassword) > 0 {
 			// Password field is mean new password
-			_, err = auth.Login("http://lldap-service.os-system:17170", userName, passwordReset.CurrentPassword)
+			_, err = auth.Login("http://lldap-service.os-framework:17170", userName, passwordReset.CurrentPassword)
 			if err != nil {
 				response.HandleError(resp, errors.Errorf("reset password: verify password hash err, %v", err))
 				return
@@ -1191,7 +1191,7 @@ func (h *Handler) handleValidateUserPassword(req *restful.Request, resp *restful
 		return
 	}
 
-	_, err := auth.Login("http://lldap-service.os-system:17170", userPassword.UserName, userPassword.Password)
+	_, err := auth.Login("http://lldap-service.os-framework:17170", userPassword.UserName, userPassword.Password)
 	if err != nil {
 		response.HandleError(resp, errors.Errorf("validate password: verify password hash err, %v", err))
 		return

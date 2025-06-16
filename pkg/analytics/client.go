@@ -44,7 +44,7 @@ func (a *Client) GetAnalyticsID(appName string, appId string, ownerName string) 
 	req := Request{
 		Name: appName,
 	}
-	url := "http://analytics-server.os-system:3010/api/websites"
+	url := "http://analytics-server.os-framework:3010/api/websites"
 
 	resp, err := a.client.R().
 		SetHeader(restful.HEADER_ContentType, restful.MIME_JSON).
