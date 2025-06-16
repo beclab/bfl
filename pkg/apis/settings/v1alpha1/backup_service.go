@@ -62,7 +62,7 @@ type BackupService struct {
 }
 
 func NewBackupService() *BackupService {
-	addr := utils.EnvOrDefault("BACKUP_SERVER", "backup-server.os-system:8082")
+	addr := utils.EnvOrDefault("BACKUP_SERVER", "backup-server.os-framework:8082")
 
 	addr = strings.TrimRight(addr, "/")
 	apiPrefix := fmt.Sprintf("http://%s/apis/backup/%s", addr, backupAPIVersion)

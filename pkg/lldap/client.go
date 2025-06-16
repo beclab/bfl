@@ -30,7 +30,7 @@ func New() (*client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	secret, err := clientSet.CoreV1().Secrets("os-system").Get(context.TODO(), "lldap-credentials", metav1.GetOptions{})
+	secret, err := clientSet.CoreV1().Secrets("os-framework").Get(context.TODO(), "lldap-credentials", metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func New() (*client.Client, error) {
 		return nil, err
 	}
 	lldapClient, err := client.New(&config.Config{
-		Host:       "http://lldap-service.os-system:17170",
+		Host:       "http://lldap-service.os-framework:17170",
 		Username:   bindUsername,
 		Password:   bindPassword,
 		TokenCache: memory.New(),
