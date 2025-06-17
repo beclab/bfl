@@ -3,13 +3,14 @@ package v1alpha1
 import (
 	"encoding/json"
 	"fmt"
-	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/api/response"
@@ -318,6 +319,13 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		}
 		log.Debugf("created l4 proxy deployment: %s", utils.PrettyJSON(createdProxy))
 	}
+
+	if err != nil {
+		log.Errorf("get l4-proxy deployment err: %v", err)
+		response.HandleError(resp, errors.Errorf("enable https: get l4 proxy deployment err, %v", err))
+		return
+	}
+
 	o.L4ProxyNamespace = namespace
 
 	log.Info("creating async task to enable https")
