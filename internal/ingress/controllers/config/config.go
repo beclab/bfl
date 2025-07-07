@@ -520,11 +520,7 @@ type Server struct {
 
 	Locations []Location `json:"locations,omitempty"`
 
-	EnableAuth bool `json:"enableAuth"`
-
-	EnableAnalytics bool   `json:"enableAnalytics"`
-	AnalyticsScript string `json:"analyticsScript"`
-
+	EnableAuth            bool   `json:"enableAuth"`
 	EnableOIDC            bool   `json:"enableOIDC"`
 	EnableWindowPushState bool   `json:"enableWindowPushState"`
 	Language              string `json:"language"`
