@@ -26,9 +26,9 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/utils/httpclient"
 	"github.com/beclab/lldap-client/pkg/auth"
 
-	apiRuntime "bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"github.com/asaskevich/govalidator"
 	"github.com/emicklei/go-restful/v3"
+	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 	corev1 "k8s.io/api/core/v1"
@@ -729,8 +729,19 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		response.HandleBadRequest(resp, errors.Errorf("reset password: %v", err))
 		return
 	}
+	token := req.HeaderParameter(constants.AuthorizationTokenKey)
 
-	log.Info("reset user password")
+	if passwordReset.Password == "" {
+		response.HandleError(resp, errors.New("reset password: new password is empty"))
+		return
+	}
+
+	if passwordReset.Password == passwordReset.CurrentPassword {
+		response.HandleBadRequest(resp, errors.New("reset password: the tow passwords must be different"))
+		return
+	}
+
+	log.Info("start reset user password")
 
 	ctx, iamClient := req.Request.Context(), h.newIamClient(req)
 
@@ -741,121 +752,90 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		return
 	}
 
-	lldapClient, err := lldap.New()
+	//lldapClient, err := lldap.New()
+	//if err != nil {
+	//	response.HandleError(resp, err)
+	//	return
+	//}
+
+	//if userName == constants.Username {
+	// change user password itself
+
+	//if len(passwordReset.CurrentPassword) > 0 {
+	//	// Password field is mean new password
+	//	_, err = auth.Login("http://lldap-service.os-platform:17170", userName, passwordReset.CurrentPassword)
+	//	if err != nil {
+	//		response.HandleError(resp, errors.Errorf("reset password: verify password hash err, %v", err))
+	//		return
+	//	}
+	//
+	//} else {
+	//	tokenStr := req.HeaderParameter(constants.AuthorizationTokenKey)
+	//	if tokenStr == "" {
+	//		response.HandleUnauthorized(resp, response.NewTokenValidationError("token not provided"))
+	//		return
+	//	}
+	//
+	//	claims, err := apiRuntime.ParseToken(tokenStr)
+	//	if err != nil {
+	//		response.HandleUnauthorized(resp, response.NewTokenValidationError("parse token", err))
+	//		return
+	//	}
+	//
+	//	if claims.Username != constants.Username {
+	//		response.HandleError(resp, errors.Errorf("reset password: verify token err, invalid token"))
+	//		return
+	//	}
+	//
+	//}
+
+	// Reset Password
+	//user.Spec.EncryptedPassword = passwordReset.Password
+	if user.Annotations[constants.UserTerminusWizardStatus] != string(constants.Completed) {
+		// only initializing in progress
+		user.Annotations[constants.UserTerminusWizardStatus] = string(constants.Completed)
+
+		// init completed, user's wizard will be closed
+		go func() {
+			kubeClient := runtime.NewKubeClient(req)
+			deploy := kubeClient.Kubernetes().AppsV1().Deployments(constants.Namespace)
+			ctx := context.Background()
+			wizard, err := deploy.Get(ctx, "wizard", metav1.GetOptions{})
+			if err != nil {
+				klog.Error("find wizard deployment error, ", err)
+				return
+			}
+
+			err = deploy.Delete(ctx, wizard.Name, metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				klog.Error("delete deployment wizard error, ", err)
+				return
+			}
+
+			klog.Info("success to delete wizard")
+		}()
+		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
+		if err != nil {
+			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
+			return
+		}
+
+	}
+	url := fmt.Sprintf("http://authelia-backend.os-framework:9091/api/reset/%s/password", userName)
+	client := resty.New()
+	res, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("X-Authorization", token).
+		SetHeader("X-BFL-USER", userName).
+		SetBody(&passwordReset).
+		Post(url)
 	if err != nil {
-		response.HandleError(resp, err)
+		response.HandleError(resp, errors.Errorf("reset password: request authelia failed %v", err))
 		return
 	}
-
-	if userName == constants.Username {
-		// change user password itself
-		if passwordReset.Password == "" {
-			response.HandleError(resp, errors.New("reset password: new password is empty"))
-			return
-		}
-
-		if len(passwordReset.CurrentPassword) > 0 {
-			// Password field is mean new password
-			_, err = auth.Login("http://lldap-service.os-platform:17170", userName, passwordReset.CurrentPassword)
-			if err != nil {
-				response.HandleError(resp, errors.Errorf("reset password: verify password hash err, %v", err))
-				return
-			}
-
-			if passwordReset.Password == passwordReset.CurrentPassword {
-				response.HandleBadRequest(resp, errors.New("reset password: the tow passwords must be different"))
-				return
-			}
-
-		} else {
-			tokenStr := req.HeaderParameter(constants.AuthorizationTokenKey)
-			if tokenStr == "" {
-				response.HandleUnauthorized(resp, response.NewTokenValidationError("token not provided"))
-				return
-			}
-
-			claims, err := apiRuntime.ParseToken(tokenStr)
-			if err != nil {
-				response.HandleUnauthorized(resp, response.NewTokenValidationError("parse token", err))
-				return
-			}
-
-			if claims.Username != constants.Username {
-				response.HandleError(resp, errors.Errorf("reset password: verify token err, invalid token"))
-				return
-			}
-
-		}
-
-		// Reset Password
-		//user.Spec.EncryptedPassword = passwordReset.Password
-		if user.Annotations[constants.UserTerminusWizardStatus] != string(constants.Completed) {
-			// only initializing in progress
-			user.Annotations[constants.UserTerminusWizardStatus] = string(constants.Completed)
-
-			// init completed, user's wizard will be closed
-			go func() {
-				kubeClient := runtime.NewKubeClient(req)
-				deploy := kubeClient.Kubernetes().AppsV1().Deployments(constants.Namespace)
-				ctx := context.Background()
-				wizard, err := deploy.Get(ctx, "wizard", metav1.GetOptions{})
-				if err != nil {
-					klog.Error("find wizard deployment error, ", err)
-					return
-				}
-
-				err = deploy.Delete(ctx, wizard.Name, metav1.DeleteOptions{})
-				if err != nil && !apierrors.IsNotFound(err) {
-					klog.Error("delete deployment wizard error, ", err)
-					return
-				}
-
-				klog.Info("success to delete wizard")
-			}()
-
-		}
-
-		err = lldapClient.Users().ResetPassword(ctx, userName, passwordReset.Password)
-		if err != nil {
-			response.HandleError(resp, errors.Errorf("reset password: set user password err, %v", err))
-			return
-		}
-		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
-		if err != nil {
-			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
-			return
-		}
-
-	} else {
-		admin, err := iamClient.Users().Get(ctx, constants.Username, metav1.GetOptions{})
-		if err != nil {
-			response.HandleError(resp, errors.Errorf("reset password: get user role err, %v", err))
-			return
-		}
-
-		role, ok := admin.Annotations[constants.UserAnnotationOwnerRole]
-		if !ok {
-			response.HandleError(resp, errors.Errorf("invalid user %q, no owner role annotation", admin.Name))
-			return
-		}
-
-		if role != constants.RolePlatformAdmin {
-			response.HandleError(resp, errors.New("no privilege to reset password of another user"))
-			return
-		}
-
-		//user.Spec.EncryptedPassword = passwordReset.Password
-		err = lldapClient.Users().ResetPassword(ctx, userName, passwordReset.Password)
-		if err != nil {
-			response.HandleError(resp, errors.Errorf("reset password: set user password err, %v", err))
-			return
-		}
-		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
-		if err != nil {
-			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
-			return
-		}
-
+	if res.StatusCode() != http.StatusOK {
+		response.HandleError(resp, errors.New(res.String()))
+		return
 	}
 
 	response.SuccessNoData(resp)
