@@ -307,12 +307,7 @@ http {
             sub_filter '</head>' '<meta name="terminus-language" content="{{ $server.Language }}"/>\n</head>';
             {{ end }}
 
-
-            {{ if and $server.EnableAnalytics (not (eq $server.AnalyticsScript "")) }}
-            sub_filter '</body>' "{{ $server.AnalyticsScript }}\n</body>";
-            {{ end }}
-
-            {{ if or $server.EnableWindowPushState (and $server.EnableAnalytics (not (eq $server.AnalyticsScript ""))) }}
+            {{ if $server.EnableWindowPushState }}
             sub_filter_once off;
             {{ end }}
 
@@ -423,10 +418,8 @@ http {
             sub_filter '</head>' '<meta name="terminus-language" content="{{ $server.Language }}"/>\n</head>';
             {{ end }}
 
-            {{ if and $server.EnableAnalytics (not (eq $server.AnalyticsScript "")) }}
-            sub_filter '</body>' "{{ $server.AnalyticsScript }}\n</body>";
-            {{ end }}
-            {{ if or $server.EnableWindowPushState (and $server.EnableAnalytics (not (eq $server.AnalyticsScript ""))) }}
+
+            {{ if or $server.EnableWindowPushState }}
             sub_filter_once off;
             {{ end }}
         }

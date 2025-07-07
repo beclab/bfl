@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"bytetrade.io/web3os/bfl/internal/ingress/controllers/config"
-	"bytetrade.io/web3os/bfl/pkg/analytics"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 
@@ -13,58 +12,35 @@ import (
 
 var nonAppServers = []NonAppServer{
 	{
-		Name:             "auth",
-		SvcEndpoint:      "http://authelia-svc.%s.svc.cluster.local:80",
-		AuthEnabled:      false,
-		AnalyticsEnabled: false,
+		Name:        "auth",
+		SvcEndpoint: "http://authelia-svc.%s.svc.cluster.local:80",
+		AuthEnabled: false,
 	},
 	{
-		Name:             "desktop",
-		SvcEndpoint:      "http://edge-desktop.%s.svc.cluster.local:80",
-		AuthEnabled:      true,
-		AnalyticsEnabled: true,
+		Name:        "desktop",
+		SvcEndpoint: "http://edge-desktop.%s.svc.cluster.local:80",
+		AuthEnabled: true,
 	},
 	{
-		Name:             "wizard",
-		SvcEndpoint:      "http://wizard.%s.svc.cluster.local:80",
-		AuthEnabled:      true,
-		AnalyticsEnabled: false,
+		Name:        "wizard",
+		SvcEndpoint: "http://wizard.%s.svc.cluster.local:80",
+		AuthEnabled: true,
 	},
 }
 
 type NonAppServer struct {
-	Name             string
-	LocationPrefix   string
-	SvcEndpoint      string
-	AuthEnabled      bool
-	AnalyticsEnabled bool
+	Name           string
+	LocationPrefix string
+	SvcEndpoint    string
+	AuthEnabled    bool
 }
 
 func (r *NginxController) genNonAppServers(zone string, isEphemeral bool, language string) []config.Server {
 	servers := make([]config.Server, 0)
-	client := analytics.NewClient()
 	for _, app := range nonAppServers {
 		hostname := fmt.Sprintf("%s.%s", app.Name, zone)
 		if isEphemeral {
 			hostname = fmt.Sprintf("%s-%s.%s", app.Name, constants.Username, zone)
-		}
-
-		var enableAnalytics bool
-		var analyticsScript string
-
-		if app.AnalyticsEnabled {
-			resp, err := client.GetAnalyticsID(app.Name, app.Name, constants.Username)
-			if err != nil {
-				klog.Warningf("Failed to get analytics id, %v", err)
-			} else {
-				r, err := analytics.GetAnalyticsScript(zone, resp.ID)
-				if err != nil {
-					klog.Warningf("Failed to get analytics script, %v", err)
-				} else {
-					analyticsScript = r
-					enableAnalytics = true
-				}
-			}
 		}
 
 		servers = append(servers, config.Server{
@@ -78,9 +54,7 @@ func (r *NginxController) genNonAppServers(zone string, isEphemeral bool, langua
 					ProxyPass: fmt.Sprintf(app.SvcEndpoint, constants.Namespace),
 				},
 			},
-			EnableAnalytics: enableAnalytics,
-			AnalyticsScript: analyticsScript,
-			Language:        language,
+			Language: language,
 		})
 	}
 	return servers
@@ -88,7 +62,6 @@ func (r *NginxController) genNonAppServers(zone string, isEphemeral bool, langua
 
 func (r *NginxController) addDomainServers(isEphemeral bool, zone string, language string) []config.Server {
 	servers := make([]config.Server, 0)
-	client := analytics.NewClient()
 
 	profile := config.Server{
 		Hostname:  zone,
@@ -102,20 +75,6 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 		},
 		EnableAuth: false,
 		Language:   language,
-	}
-
-	// add analytics to profile
-	resp, err := client.GetAnalyticsID("profile", "profile", constants.Username)
-	if err != nil {
-		klog.Warningf("Failed to get analytics id, %v", err)
-	} else {
-		r, err := analytics.GetAnalyticsScript(zone, resp.ID)
-		if err != nil {
-			klog.Warningf("Failed to get analytics script, %v", err)
-		} else {
-			profile.AnalyticsScript = r
-			profile.EnableAnalytics = true
-		}
 	}
 
 	formatDomain := func(customPrefixDomain string) []string {
@@ -171,26 +130,6 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 				appHostname = fmt.Sprintf("%s-%s.%s", prefix, constants.Username, zone)
 			}
 
-			var enableAnalytics bool
-			var analyticsScript string
-
-			if app.Spec.Settings != nil {
-				if v, ok := app.Spec.Settings["analyticsEnabled"]; ok && v == "true" {
-					resp, err := client.GetAnalyticsID(app.Spec.Name, app.Spec.Appid, constants.Username)
-					if err != nil {
-						klog.Warningf("Failed to get analytics id, %v", err)
-					} else {
-						r, err := analytics.GetAnalyticsScript(zone, resp.ID)
-						if err != nil {
-							klog.Warningf("Failed to get analytics script, %v", err)
-						} else {
-							analyticsScript = r
-							enableAnalytics = true
-						}
-					}
-				}
-			}
-
 			_, enableOIDC := app.Spec.Settings["oidc.client.id"]
 
 			s := config.Server{
@@ -204,8 +143,6 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 						ProxyPass: fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", entrance.Host, app.Spec.Namespace, entrance.Port),
 					},
 				},
-				EnableAnalytics:       enableAnalytics,
-				AnalyticsScript:       analyticsScript,
 				EnableOIDC:            enableOIDC,
 				EnableWindowPushState: entrance.WindowPushState,
 				Language:              language,
