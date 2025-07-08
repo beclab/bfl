@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 
 	"bytetrade.io/web3os/bfl/internal/ingress/controllers/config"
@@ -86,7 +87,7 @@ func (r *NginxController) genNonAppServers(zone string, isEphemeral bool, langua
 	return servers
 }
 
-func (r *NginxController) addDomainServers(isEphemeral bool, zone string, language string) []config.Server {
+func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool, zone string, language string) []config.Server {
 	servers := make([]config.Server, 0)
 	client := analytics.NewClient()
 
@@ -210,6 +211,17 @@ func (r *NginxController) addDomainServers(isEphemeral bool, zone string, langua
 				EnableWindowPushState: entrance.WindowPushState,
 				Language:              language,
 			}
+
+			// server patches
+			if patches, ok := patches[app.Spec.Name]; ok {
+				for _, patch := range patches {
+					_, err = patch(ctx, r, &s)
+					if err != nil {
+						klog.Errorf("failed to apply patch for app %s, %v", app.Spec.Name, err)
+					}
+				}
+			}
+
 			servers = append(servers, s)
 		}
 	}

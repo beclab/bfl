@@ -295,9 +295,13 @@ http {
 
         {{ range $location := $server.Locations }}
         location {{ $location.Prefix }} {
+            {{ if $location.DirectProxy }}
+            proxy_pass {{ $location.ProxyPass }};
+            {{ else }}
             resolver coredns.kube-system.svc.cluster.local;
             set $h {{ $location.ProxyPass }};
             proxy_pass $h;
+            {{ end }}
 
             {{ if $server.EnableWindowPushState }}
             sub_filter '</html>' '{{ $windowPushStateScript }}\n</html>';
@@ -318,6 +322,10 @@ http {
 
             {{ if $server.EnableOIDC }}
             add_header Set-Cookie "prev-host=$http_host;Domain=.{{ $userZone }};Path=/;";
+            {{ end }}
+
+            {{ range $additional := $location.Additionals }}
+            {{ $additional }}
             {{ end }}
         }
         {{ end }}

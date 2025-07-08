@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"bytes"
-	"bytetrade.io/web3os/bfl/pkg/watchers/apps"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"bytetrade.io/web3os/bfl/pkg/watchers/apps"
 
 	v1alpha1App "bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 	"bytetrade.io/web3os/bfl/internal/ingress/controllers/config"
@@ -81,7 +82,16 @@ type customDomainCertPath struct {
 	keyPath  string
 }
 
+const FILESERVER_CHANGED = "fileserver-changed"
+
+var AUTHELIA_URL = "http://authelia-backend.os-framework.svc.cluster.local:9091/api/authz/auth-request"
+
 func (r *NginxController) RunNginx() error {
+	envUrl := os.Getenv("AUTHELIA_AUTH_URL")
+	if envUrl != "" {
+		AUTHELIA_URL = envUrl
+	}
+
 	// init
 	r.command = nginx.NewNginxCommand()
 
@@ -290,9 +300,11 @@ func (r *NginxController) generateNginxServers() ([]config.Server, error) {
 
 	servers := make([]config.Server, 0)
 
+	ctx := context.TODO()
+
 	// get the bfl service
 	var svc corev1.Service
-	err := r.Get(context.TODO(), types.NamespacedName{Namespace: constants.Namespace, Name: constants.BFLServiceName}, &svc)
+	err := r.Get(ctx, types.NamespacedName{Namespace: constants.Namespace, Name: constants.BFLServiceName}, &svc)
 	if err != nil {
 		return nil, fmt.Errorf("no bfl service found, %v", err)
 	}
@@ -374,6 +386,18 @@ func (r *NginxController) generateNginxServers() ([]config.Server, error) {
 					},
 				},
 			}
+
+			// server patches
+			if patches, ok := patches[app.Spec.Name]; ok {
+				for _, patch := range patches {
+					_, err = patch(ctx, r, &s)
+					if err != nil {
+						klog.Errorf("failed to apply patch for app %s, %v", app.Spec.Name, err)
+						return nil, err
+					}
+				}
+			}
+
 			servers = append(servers, s)
 		}
 	}
@@ -411,13 +435,13 @@ func (r *NginxController) generateNginxServers() ([]config.Server, error) {
 		language := op.GetUserAnnotation(user, "bytetrade.io/language")
 
 		if ephemeral, ok := r.sslConfigData["ephemeral"]; !ok {
-			_servers = r.addDomainServers(false, zone, language)
+			_servers = r.addDomainServers(ctx, false, zone, language)
 		} else {
 			isEphemeral, err = strconv.ParseBool(ephemeral)
 			if err != nil {
 				return nil, err
 			}
-			_servers = r.addDomainServers(isEphemeral, zone, language)
+			_servers = r.addDomainServers(ctx, isEphemeral, zone, language)
 		}
 
 		servers = append(servers, _servers...)
@@ -688,6 +712,10 @@ func (r *NginxController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		customDomains   []string
 	)
 
+	if req.Name == FILESERVER_CHANGED {
+		needRender = true
+	}
+
 	modifyAllowedDomainTimestamp := func() error {
 		userOp, err := operator.NewUserOperator()
 		if err != nil {
@@ -885,6 +913,39 @@ func (r *NginxController) SetupWithManager(mgr ctrl.Manager) error {
 	if err != nil {
 		return err
 	}
+
+	// watch file-server
+	// if file-server pod is created or deleted, we need to update nginx config
+	// file-server is a daemonset, if a node is created or removed, so file-server pod will be created or deleted too
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}},
+		handler.EnqueueRequestsFromMapFunc(
+			func(object client.Object) []reconcile.Request {
+				return []reconcile.Request{{NamespacedName: types.NamespacedName{
+					Namespace: object.GetNamespace(),
+					Name:      FILESERVER_CHANGED,
+				}}}
+			}),
+		predicate.Funcs{
+			GenericFunc: func(e event.GenericEvent) bool { return false },
+			CreateFunc:  func(e event.CreateEvent) bool { return isFileServerPod(e.Object) },
+			DeleteFunc:  func(e event.DeleteEvent) bool { return isFileServerPod(e.Object) },
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				if !isFileServerPod(e.ObjectNew) {
+					return false
+				}
+				old, ok1 := e.ObjectOld.(*corev1.Pod)
+				_new, ok2 := e.ObjectNew.(*corev1.Pod)
+				if !(ok1 && ok2) || reflect.DeepEqual(old.Spec, _new.Spec) {
+					return false
+				}
+				return true
+			},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
 	return c.Watch(&source.Kind{Type: &iamV1alpha2.User{}},
 		handler.EnqueueRequestsFromMapFunc(
 			func(object client.Object) []reconcile.Request {
@@ -954,4 +1015,12 @@ func getAppEntrancesHostName(entrancescount, index int, appid string) string {
 		return fmt.Sprintf("%s", appid)
 	}
 	return fmt.Sprintf("%s%d", appid, index)
+}
+
+func isFileServerPod(obj client.Object) bool {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return false
+	}
+	return pod.Labels["app"] == "files"
 }
