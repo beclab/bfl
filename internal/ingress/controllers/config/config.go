@@ -539,8 +539,10 @@ type CustomServer struct {
 }
 
 type Location struct {
-	Prefix    string `json:"prefix" yaml:"prefix"`
-	ProxyPass string `json:"proxy-pass" yaml:"proxyPass"`
+	Prefix      string   `json:"prefix" yaml:"prefix"`
+	ProxyPass   string   `json:"proxy-pass" yaml:"proxyPass"`
+	Additionals []string `json:"additionals,omitempty" yaml:"additionals,omitempty"`
+	DirectProxy bool     `json:"direct-proxy,omitempty" yaml:"directProxy,omitempty"`
 }
 
 // ListenPorts describe the ports required to run the
