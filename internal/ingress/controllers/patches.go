@@ -118,7 +118,7 @@ func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server
 		"/api/raw/external/",
 		"/api/tree/external/",
 		"/api/mount/",
-		"/api/unmount/",
+		"/api/unmount/external/",
 		"/api/smb_history/",
 		"/upload/upload-link/",
 		"/upload/file-uploaded-bytes/",
