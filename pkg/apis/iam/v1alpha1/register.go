@@ -23,16 +23,7 @@ var (
 func AddToContainer(c *restful.Container, addCallback func(func() error, func() error)) error {
 	ws := runtime.NewWebService(ModuleVersion)
 	handler := New()
-
-	// TODO:hysyeah
-	/*	ws.Route(ws.POST("/login").
-		To(handler.handleUserLogin).
-		Doc("Login user, get the JWT token.").
-		Metadata(restfulspec.KeyOpenAPITags, iamTags).
-		Reads(UserPassword{}).
-		Produces(restful.MIME_JSON).
-		Returns(http.StatusOK, "", response.Response{}))*/
-	//
+	
 	ws.Route(ws.POST("/refresh-token").
 		To(handler.handleRefreshToken).
 		Doc("Refresh JWT token.").
@@ -40,37 +31,11 @@ func AddToContainer(c *restful.Container, addCallback func(func() error, func() 
 		Reads(PostRefreshToken{}, "Refresh Token").
 		Produces(restful.MIME_JSON).
 		Returns(http.StatusOK, "", response.Response{}))
-	//
-	//ws.Route(ws.POST("/logout").
-	//	To(handler.handleUserLogOut).
-	//	Doc("Logout user.").
-	//	Metadata(restfulspec.KeyOpenAPITags, iamTags).
-	//	Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-	//	Returns(http.StatusOK, "", response.Header{}))
-	// TODO:hysyeah
 
 	ws.Route(ws.GET("/users").
 		To(handler.handleListUsers).
 		Doc("List users.").
 		Metadata(restfulspec.KeyOpenAPITags, userTags).
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Produces(restful.MIME_JSON).
-		Returns(http.StatusOK, "", response.Response{}))
-
-	ws.Route(ws.GET("/users/{user}").
-		To(handler.handleDescribeUser).
-		Doc("Retrieve user details.").
-		Metadata(restfulspec.KeyOpenAPITags, userTags).
-		Param(ws.PathParameter("user", "user name").DataType("string").Required(true)).
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Produces(restful.MIME_JSON).
-		Returns(http.StatusOK, "", response.Response{}))
-
-	ws.Route(ws.GET("/users/{user}/status").
-		To(handler.handleUserStatus).
-		Doc("Retrieve user creating or deleting status.").
-		Metadata(restfulspec.KeyOpenAPITags, userTags).
-		Param(ws.PathParameter("user", "user name").DataType("string").Required(true)).
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Produces(restful.MIME_JSON).
 		Returns(http.StatusOK, "", response.Response{}))
@@ -84,24 +49,6 @@ func AddToContainer(c *restful.Container, addCallback func(func() error, func() 
 		Produces(restful.MIME_JSON).
 		Returns(http.StatusOK, "", response.Response{}))
 
-	ws.Route(ws.POST("/users").
-		To(handler.handleCreateUser).
-		Doc("Create user.").
-		Metadata(restfulspec.KeyOpenAPITags, userTags).
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Reads(UserCreate{}).
-		Consumes(restful.MIME_JSON).Produces(restful.MIME_JSON).
-		Returns(http.StatusOK, "", response.Response{}))
-
-	ws.Route(ws.DELETE("/users/{user}").
-		To(handler.handleDeleteUser).
-		Doc("Delete user.").
-		Metadata(restfulspec.KeyOpenAPITags, userTags).
-		Param(ws.PathParameter("user", "delete user name").DataType("string").Required(true)).
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Produces(restful.MIME_JSON).
-		Returns(http.StatusOK, "", response.Response{}))
-
 	ws.Route(ws.PUT("/users/{user}/password").
 		To(handler.handleResetUserPassword).
 		Doc("Reset user password.").
@@ -109,17 +56,6 @@ func AddToContainer(c *restful.Container, addCallback func(func() error, func() 
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Param(ws.PathParameter("user", "user name").DataType("string").Required(true)).
 		Reads(PasswordReset{}).
-		Produces(restful.MIME_JSON).
-		Returns(http.StatusOK, "Reset password", response.Response{}))
-
-	ws.Route(ws.PUT("/users/{user}/limits").
-		To(handler.handleUpdateUserLimits).
-		Reads(UserResourceLimit{}).
-		Doc("update user's limits.").
-		Metadata(restfulspec.KeyOpenAPITags, userTags).
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Param(ws.PathParameter("user", "user name").DataType("string").Required(true)).
-		Reads(UserResourceLimit{}).
 		Produces(restful.MIME_JSON).
 		Returns(http.StatusOK, "Reset password", response.Response{}))
 

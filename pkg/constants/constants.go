@@ -33,7 +33,7 @@ var (
 
 	KubeSphereClientSecret = "kubesphere"
 
-	AnnotationUserCreator = "kubesphere.io/creator"
+	AnnotationUserCreator = "bytetrade.io/creator"
 
 	KubeSphereCacheRedisHost = "redis.kubesphere-system.svc"
 
