@@ -191,9 +191,9 @@ var (
 )
 
 var (
-	RolePlatformAdmin = "platform-admin"
-
-	RoleWorkspacesManager = "workspaces-manager"
+	RoleOwner  = "owner"
+	RoleAdmin  = "admin"
+	RoleNormal = "normal"
 )
 
 var (

@@ -45,10 +45,11 @@ const (
 )
 
 var defaultGlobalRoles = []string{
-	constants.RolePlatformAdmin,
+	constants.RoleOwner,
 	// "platform-regular",    useless role
 	// "users-manager",
-	constants.RoleWorkspacesManager,
+	constants.RoleAdmin,
+	constants.RoleOwner,
 }
 
 type Handler struct {

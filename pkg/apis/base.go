@@ -114,7 +114,7 @@ func (b *Base) IsAdminUser(ctx context.Context) (bool, error) {
 	if !ok {
 		return false, errors.Errorf("invalid user %q, no owner role annotation", user.Name)
 	}
-	return role == constants.RolePlatformAdmin, nil
+	return role == constants.RoleOwner || role == constants.RoleAdmin, nil
 }
 
 func (b *Base) HandleGetSysConfig(_ *restful.Request, resp *restful.Response) {
