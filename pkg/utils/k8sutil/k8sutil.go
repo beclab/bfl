@@ -86,7 +86,7 @@ func GetMasterExternalIP(ctx context.Context) *string {
 	var externalIP string
 
 	for _, user := range users.Items {
-		if role, ok := user.Annotations[constants.UserAnnotationOwnerRole]; ok && role == constants.RolePlatformAdmin {
+		if role, ok := user.Annotations[constants.UserAnnotationOwnerRole]; ok && role == constants.RoleOwner {
 			ip, ok1 := user.Annotations[constants.UserAnnotationPublicDomainIp]
 			if ok1 && ip != "" {
 				if _ip := net.ParseIP(ip); _ip != nil {

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytetrade.io/web3os/bfl/pkg/utils"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
 	"bytetrade.io/web3os/bfl/pkg/apis/settings/v1alpha1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
-	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
 	"bytetrade.io/web3os/bfl/pkg/utils/k8sutil"
 	"github.com/emicklei/go-restful"
@@ -95,7 +95,7 @@ func reconcile(ctx context.Context, terminusName constants.TerminusName, zone st
 	if isPublicIP {
 		// only for public ip
 		publicIp := ""
-		if role, ok := user.Annotations[constants.UserAnnotationOwnerRole]; ok && role == constants.RolePlatformAdmin {
+		if role, ok := user.Annotations[constants.UserAnnotationOwnerRole]; ok && (role == constants.RoleAdmin || role == constants.RoleOwner) {
 			publicIp = utils.GetMyExternalIPAddr()
 		} else {
 			publicIp = *k8sutil.GetMasterExternalIP(ctx)

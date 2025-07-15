@@ -98,7 +98,7 @@ func (b *BackupService) IsAdminUser(ctx context.Context) (bool, error) {
 	if !ok {
 		return false, errors.Errorf("invalid user %q, no owner role annotation", user.Name)
 	}
-	return role == constants.RolePlatformAdmin, nil
+	return role == constants.RoleOwner || role == constants.RoleAdmin, nil
 }
 
 func (b *BackupService) CreatePlan(data any) (any, error) {
