@@ -15,6 +15,9 @@ var patches = map[string][]func(ctx context.Context, r *NginxController, s *conf
 	"files": {
 		filesNodeApiPatch,
 	},
+	"settings": {
+		filesNodeApiPatch,
+	},
 }
 
 var locationAdditionalsCommon = func(node string) []string {
