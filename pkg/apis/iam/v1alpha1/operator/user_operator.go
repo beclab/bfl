@@ -64,6 +64,20 @@ func (o *UserOperator) ListUsers() ([]*iamV1alpha2.User, error) {
 	return _users, nil
 }
 
+func (o *UserOperator) GetOwnerUser() (*iamV1alpha2.User, error) {
+	userList, err := o.ListUsers()
+	if err != nil {
+		klog.Errorf("get user list error %v", err)
+		return nil, err
+	}
+	for _, u := range userList {
+		if u.Annotations[constants.UserAnnotationOwnerRole] == constants.RoleOwner {
+			return u, nil
+		}
+	}
+	return nil, errors.New("owner user not found")
+}
+
 func (o *UserOperator) GetUser(name string) (*iamV1alpha2.User, error) {
 	if name == "" {
 		name = constants.Username
@@ -179,10 +193,24 @@ func (o *UserOperator) GetUserZone(user *iamV1alpha2.User) string {
 
 	creator := o.GetUserAnnotation(user, constants.AnnotationUserCreator)
 	if creator != "" {
-		creatorUser, err := o.GetUser(creator)
-		if err == nil && creatorUser != nil {
-			return o.GetUserAnnotation(creatorUser, constants.UserAnnotationZoneKey)
+		if creator == "cli" {
+			oUser, err := o.GetOwnerUser()
+			if err != nil {
+				klog.Errorf("failed to get user with owner role %v", err)
+			}
+			if err == nil {
+				return oUser.Name
+			}
+		} else {
+			creatorUser, err := o.GetUser(creator)
+			if err != nil {
+				klog.Errorf("failed to get creator user %v", err)
+			}
+			if err == nil && creatorUser != nil {
+				return o.GetUserAnnotation(creatorUser, constants.UserAnnotationZoneKey)
+			}
 		}
+
 	}
 	return ""
 }
@@ -204,9 +232,18 @@ func (o *UserOperator) GetUserDomainType(user *iamV1alpha2.User) (bool, string, 
 	// Find the creator user's zone
 	creatorUserName := o.GetUserAnnotation(user, constants.AnnotationUserCreator)
 	if creatorUserName != "" {
-		creatorUser, err := o.GetUser(creatorUserName)
-		if err != nil {
-			return false, "", err
+		var creatorUser *iamV1alpha2.User
+		var err error
+		if creatorUserName == "cli" {
+			creatorUser, err = o.GetOwnerUser()
+			if err != nil {
+				return false, "", err
+			}
+		} else {
+			creatorUser, err = o.GetUser(creatorUserName)
+			if err != nil {
+				return false, "", err
+			}
 		}
 
 		if v := o.GetUserAnnotation(creatorUser, constants.UserAnnotationZoneKey); v != "" {
