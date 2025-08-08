@@ -120,6 +120,7 @@ func (h *Handler) handleUserInfo(req *restful.Request, resp *restful.Response) {
 	if createdUser == "cli" {
 		u, err := userOp.GetOwnerUser()
 		if err != nil {
+			log.Errorf("failed to find owner user: %v", err)
 			response.HandleError(resp, errors.Errorf("failed to find owner user: %v", err))
 			return
 		}

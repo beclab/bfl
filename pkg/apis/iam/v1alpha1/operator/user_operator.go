@@ -67,6 +67,7 @@ func (o *UserOperator) ListUsers() ([]*iamV1alpha2.User, error) {
 func (o *UserOperator) GetOwnerUser() (*iamV1alpha2.User, error) {
 	userList, err := o.ListUsers()
 	if err != nil {
+		klog.Errorf("get user list error %v", err)
 		return nil, err
 	}
 	for _, u := range userList {
@@ -194,11 +195,17 @@ func (o *UserOperator) GetUserZone(user *iamV1alpha2.User) string {
 	if creator != "" {
 		if creator == "cli" {
 			oUser, err := o.GetOwnerUser()
+			if err != nil {
+				klog.Errorf("failed to get user with owner role %v", err)
+			}
 			if err == nil {
 				return oUser.Name
 			}
 		} else {
 			creatorUser, err := o.GetUser(creator)
+			if err != nil {
+				klog.Errorf("failed to get creator user %v", err)
+			}
 			if err == nil && creatorUser != nil {
 				return o.GetUserAnnotation(creatorUser, constants.UserAnnotationZoneKey)
 			}
