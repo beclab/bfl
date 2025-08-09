@@ -7,7 +7,6 @@ import (
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/api/response"
 	appProcessV1alpha1 "bytetrade.io/web3os/bfl/pkg/apis/app_process/v1alpha1"
-	appstorev1alpha1 "bytetrade.io/web3os/bfl/pkg/apis/app_store/v1alpha1"
 	backendv1 "bytetrade.io/web3os/bfl/pkg/apis/backend/v1"
 	callbackV1alpha1 "bytetrade.io/web3os/bfl/pkg/apis/callback/v1alpha1"
 
@@ -157,7 +156,6 @@ func (s *APIServer) installModuleAPI() {
 	urlruntime.Must(iamV1alpha1.AddToContainer(s.container, callbackV1alpha1.AddBackupCallbackHandler))
 	urlruntime.Must(backendv1.AddContainer(s.container))
 	urlruntime.Must(appProcessV1alpha1.AddToContainer(s.container))
-	urlruntime.Must(appstorev1alpha1.AddToContainer(s.container))
 	urlruntime.Must(settingsV1alpha1.AddContainer(s.container))
 	urlruntime.Must(monitov1alpha1.AddContainer(s.container))
 }
