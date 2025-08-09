@@ -37,7 +37,6 @@ type Handler struct {
 	appServiceClient *app_service.Client
 	httpClient       *resty.Client
 	eventClient      *event.Client
-	backupService    *BackupService
 }
 
 func New() *Handler {
@@ -45,7 +44,6 @@ func New() *Handler {
 		appServiceClient: app_service.NewAppServiceClient(),
 		httpClient:       resty.New().SetTimeout(30 * time.Second),
 		eventClient:      event.NewClient(),
-		backupService:    NewBackupService(),
 	}
 }
 

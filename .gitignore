@@ -4,3 +4,4 @@ output
 test.go
 test.yaml
 charts
+bfl-api
