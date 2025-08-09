@@ -324,37 +324,6 @@ func AddContainer(c *restful.Container) error {
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", nil))
 
-	// system upgrade
-	ws.Route(ws.GET("/upgrade/newversion").
-		To(handler.newVersion).
-		Doc("get there is a new version can be upgrade or not").
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Param(ws.QueryParameter("dev_mode", "dev mode").DataType("bool")).
-		Returns(http.StatusOK, "Success to get the new version", &response.Response{}))
-
-	ws.Route(ws.GET("/upgrade/state").
-		To(handler.upgradeState).
-		Doc("get the running upgrade state").
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Returns(http.StatusOK, "Success to get state", &response.Response{}))
-
-	ws.Route(ws.POST("/upgrade").
-		To(handler.upgrade).
-		Doc("upgrade system").
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Param(ws.QueryParameter("dev_mode", "dev mode").DataType("bool")).
-		Returns(http.StatusOK, "Success to start upgrading", &response.Response{}))
-
-	ws.Route(ws.POST("/upgrade/cancel").
-		To(handler.upgradeCancel).
-		Doc("cancel the running upgrading").
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
-		Returns(http.StatusOK, "Success to cancel", &response.Response{}))
-
 	// headscale
 	ws.Route(ws.GET("/headscale/ssh/acl").
 		To(handler.handleGetHeadscaleSshAcl).
