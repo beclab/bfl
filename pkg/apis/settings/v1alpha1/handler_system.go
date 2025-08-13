@@ -48,7 +48,7 @@ func (h *Handler) handleEnableService(req *restful.Request, resp *restful.Respon
 		return
 	}
 
-	k8sClient := runtime.NewKubeClient(req)
+	k8sClient := runtime.NewKubeClientOrDie()
 	go h.waitToNotify(service, ServiceEnabled, k8sClient)
 
 	response.SuccessNoData(resp)
@@ -76,7 +76,7 @@ func (h *Handler) handleDisableService(req *restful.Request, resp *restful.Respo
 		return
 	}
 
-	k8sClient := runtime.NewKubeClient(req)
+	k8sClient := runtime.NewKubeClientOrDie()
 	go h.waitToNotify(service, ServiceDisabled, k8sClient)
 
 	response.SuccessNoData(resp)
@@ -84,7 +84,7 @@ func (h *Handler) handleDisableService(req *restful.Request, resp *restful.Respo
 
 func (h *Handler) handleGetServicesStatus(req *restful.Request, resp *restful.Response) {
 	var res ResponseServices
-	k8sClient := runtime.NewKubeClient(req)
+	k8sClient := runtime.NewKubeClientOrDie()
 	for _, s := range systemServices {
 		status, url, err := h.getServiceStatus(req, k8sClient, s)
 		if err != nil {
@@ -104,7 +104,7 @@ func (h *Handler) handleGetServicesStatus(req *restful.Request, resp *restful.Re
 }
 
 // return service status, service url, error
-func (h *Handler) getServiceStatus(req *restful.Request, k8sClient v1alpha1.Client, service string) (string, string, error) {
+func (h *Handler) getServiceStatus(req *restful.Request, k8sClient v1alpha1.ClientInterface, service string) (string, string, error) {
 	ns := fmt.Sprintf(constants.UserspaceNameFormat, constants.Username)
 
 	ctx := req.Request.Context()
@@ -139,7 +139,7 @@ func (h *Handler) getServiceUrl(req *restful.Request, user, serviceName string) 
 	return appURL(serviceName, serviceName), nil
 }
 
-func (h *Handler) waitToNotify(service, watchStatus string, k8sClient v1alpha1.Client) {
+func (h *Handler) waitToNotify(service, watchStatus string, k8sClient v1alpha1.ClientInterface) {
 	ns := fmt.Sprintf(constants.UserspaceNameFormat, constants.Username)
 
 	ticker := time.NewTicker(2 * time.Second)

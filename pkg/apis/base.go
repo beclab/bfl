@@ -10,9 +10,10 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type Base struct {
@@ -106,7 +107,8 @@ func (b *Base) IsAdminUser(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	user, err := kc.KubeSphere().IamV1alpha2().Users().Get(ctx, constants.Username, metav1.GetOptions{})
+	var user iamV1alpha2.User
+	err = kc.CtrlClient().Get(ctx, types.NamespacedName{Name: constants.Username}, &user)
 	if err != nil {
 		return false, err
 	}

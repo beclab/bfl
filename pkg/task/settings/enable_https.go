@@ -16,16 +16,27 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
 
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/pkg/errors"
 	batchV1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	aruntime "k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	applyBatchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
 	applyCorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	applyMetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/klog"
 	"k8s.io/utils/pointer"
 )
+
+var (
+	scheme = aruntime.NewScheme()
+)
+
+func init() {
+	utilruntime.Must(iamV1alpha2.AddToScheme(scheme))
+}
 
 var defaultWaitTimeout = 1 * time.Hour
 
@@ -101,7 +112,7 @@ type EnableHTTPSTask struct {
 	o          *EnableHTTPSTaskOption
 	ctx        context.Context
 	iamUser    *users.IamUser
-	kubeClient v1alpha1client.Client
+	kubeClient v1alpha1client.ClientInterface
 
 	cm certmanager.Interface
 }
@@ -121,8 +132,8 @@ func NewEnableHTTPSTask(option *EnableHTTPSTaskOption) (*EnableHTTPSTask, error)
 		cm:         certmanager.NewCertManager(constants.TerminusName(option.Name)),
 		o:          option,
 		ctx:        context.TODO(),
-		iamUser:    users.NewIamUser(option.AccessToken),
-		kubeClient: runtime.NewKubeClientWithToken(option.AccessToken),
+		iamUser:    users.NewIamUser(),
+		kubeClient: runtime.NewKubeClientOrDie(),
 	}
 
 	err := t.UpdateTaskState(TaskResult{State: Pending})

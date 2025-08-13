@@ -30,7 +30,7 @@ type APIServer struct {
 
 	container *restful.Container
 
-	kubeClient v1alpha1client.Client
+	kubeClient v1alpha1client.ClientInterface
 
 	cacheClient cache.Interface
 }

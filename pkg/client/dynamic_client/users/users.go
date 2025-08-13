@@ -5,10 +5,10 @@ import (
 
 	"bytetrade.io/web3os/bfl/pkg/client/dynamic_client"
 
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 )
 
 var gvr = schema.GroupVersionResource{

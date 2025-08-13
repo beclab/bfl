@@ -21,27 +21,24 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/utils/httpclient"
 	"github.com/beclab/lldap-client/pkg/auth"
 
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
-	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
-	"kubesphere.io/kubesphere/pkg/client/clientset/versioned/typed/iam/v1alpha2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	kubeSphereAPIToken = "/oauth/token"
 
 	kubeSphereAPILogout = "/oauth/logout"
-
-	minPodNumPerUser      = 25
-	reservedPodNumForUser = 10
 )
 
 var defaultGlobalRoles = []string{
@@ -55,6 +52,7 @@ var defaultGlobalRoles = []string{
 type Handler struct {
 	eventClient       *event.Client
 	userCreatingCount *atomic.Int32
+	ctrlClient        client.Client
 }
 
 type CommonTask struct {
@@ -66,15 +64,12 @@ func (ct *CommonTask) Execute() {
 	ct.execFunc()
 }
 
-func New() *Handler {
+func New(ctrlClient client.Client) *Handler {
 	return &Handler{
 		eventClient:       event.NewClient(),
 		userCreatingCount: &atomic.Int32{},
+		ctrlClient:        ctrlClient,
 	}
-}
-
-func (h *Handler) newIamClient(req *restful.Request) v1alpha2.IamV1alpha2Interface {
-	return runtime.NewKubeClient(req).KubeSphere().IamV1alpha2()
 }
 
 func (h *Handler) handleUserLogin(req *restful.Request, resp *restful.Response) {
@@ -198,8 +193,9 @@ func (h *Handler) handleUserLogOut(req *restful.Request, resp *restful.Response)
 	response.HandleInternalError(resp, errors.New(response.UnexpectedError))
 }
 
-func (h *Handler) getRolesByUserName(name string, ctx context.Context, iamClient v1alpha2.IamV1alpha2Interface) ([]string, error) {
-	globalRoleBindings, err := iamClient.GlobalRoleBindings().List(ctx, metav1.ListOptions{})
+func (h *Handler) getRolesByUserName(ctx context.Context, name string) ([]string, error) {
+	var globalRoleBindings iamV1alpha2.GlobalRoleBindingList
+	err := h.ctrlClient.List(ctx, &globalRoleBindings)
 	if err != nil {
 		return nil, err
 	}
@@ -216,8 +212,9 @@ func (h *Handler) getRolesByUserName(name string, ctx context.Context, iamClient
 	return roles.List(), nil
 }
 
-func (h *Handler) listUsers(ctx context.Context, c v1alpha2.IamV1alpha2Interface) ([]iamV1alpha2.User, error) {
-	users, err := c.Users().List(ctx, metav1.ListOptions{})
+func (h *Handler) listUsers(ctx context.Context) ([]iamV1alpha2.User, error) {
+	var users iamV1alpha2.UserList
+	err := h.ctrlClient.List(ctx, &users)
 	if err != nil {
 		return nil, err
 	}
@@ -226,9 +223,7 @@ func (h *Handler) listUsers(ctx context.Context, c v1alpha2.IamV1alpha2Interface
 }
 
 func (h *Handler) handleListUsers(req *restful.Request, resp *restful.Response) {
-	ctx, iamClient := req.Request.Context(), h.newIamClient(req)
-
-	users, err := h.listUsers(ctx, iamClient)
+	users, err := h.listUsers(req.Request.Context())
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			response.Success(resp, []any{})
@@ -243,7 +238,7 @@ func (h *Handler) handleListUsers(req *restful.Request, resp *restful.Response) 
 	for _, user := range users {
 		var roles []string
 
-		roles, err = h.getRolesByUserName(user.Name, ctx, iamClient)
+		roles, err = h.getRolesByUserName(req.Request.Context(), user.Name)
 		if err != nil {
 			break
 		}
@@ -300,9 +295,8 @@ func (h *Handler) handleListUsers(req *restful.Request, resp *restful.Response) 
 
 func (h *Handler) handleListUserLoginRecords(req *restful.Request, resp *restful.Response) {
 	name := req.PathParameter("user")
-	ctx, iamClient := req.Request.Context(), h.newIamClient(req)
 
-	users, err := h.listUsers(ctx, iamClient)
+	users, err := h.listUsers(req.Request.Context())
 	if err != nil {
 		response.HandleError(resp, errors.Errorf("list user login records: %v", err))
 		return
@@ -330,12 +324,6 @@ func (h *Handler) handleListUserLoginRecords(req *restful.Request, resp *restful
 		response.HandleError(resp, errors.Errorf("list user login records: %v", err))
 		return
 	}
-	//loginRecords, err := iamClient.LoginRecords().List(ctx, metav1.ListOptions{})
-	//if err != nil {
-	//	response.HandleError(resp, errors.Errorf("list user login records: %v", err))
-	//	return
-	//}
-
 	records := make([]LoginRecord, 0)
 	for _, r := range loginRecords {
 		records = append(records, LoginRecord{
@@ -350,19 +338,6 @@ func (h *Handler) handleListUserLoginRecords(req *restful.Request, resp *restful
 			}(),
 		})
 	}
-	//klog.Infof("loginRecord: %v", records[0])
-
-	//for _, r := range loginRecords.Items {
-	//	if strings.HasPrefix(r.Name, name) {
-	//		records = append(records, LoginRecord{
-	//			Success:   r.Spec.Success,
-	//			Type:      string(r.Spec.Type),
-	//			UserAgent: r.Spec.UserAgent,
-	//			Reason:    r.Spec.Reason,
-	//			LoginTime: pointer.Int64(r.CreationTimestamp.Unix()),
-	//		})
-	//	}
-	//}
 	response.Success(resp, api.NewListResult(records))
 }
 
@@ -390,51 +365,13 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 
 	log.Info("start reset user password")
 
-	ctx, iamClient := req.Request.Context(), h.newIamClient(req)
-
 	userName := req.PathParameter("user")
-	user, err := iamClient.Users().Get(ctx, userName, metav1.GetOptions{})
+	var user iamV1alpha2.User
+	err := h.ctrlClient.Get(req.Request.Context(), types.NamespacedName{Name: userName}, &user)
 	if err != nil {
 		response.HandleError(resp, errors.Errorf("reset password: get user err, %v", err))
 		return
 	}
-
-	//lldapClient, err := lldap.New()
-	//if err != nil {
-	//	response.HandleError(resp, err)
-	//	return
-	//}
-
-	//if userName == constants.Username {
-	// change user password itself
-
-	//if len(passwordReset.CurrentPassword) > 0 {
-	//	// Password field is mean new password
-	//	_, err = auth.Login("http://lldap-service.os-platform:17170", userName, passwordReset.CurrentPassword)
-	//	if err != nil {
-	//		response.HandleError(resp, errors.Errorf("reset password: verify password hash err, %v", err))
-	//		return
-	//	}
-	//
-	//} else {
-	//	tokenStr := req.HeaderParameter(constants.AuthorizationTokenKey)
-	//	if tokenStr == "" {
-	//		response.HandleUnauthorized(resp, response.NewTokenValidationError("token not provided"))
-	//		return
-	//	}
-	//
-	//	claims, err := apiRuntime.ParseToken(tokenStr)
-	//	if err != nil {
-	//		response.HandleUnauthorized(resp, response.NewTokenValidationError("parse token", err))
-	//		return
-	//	}
-	//
-	//	if claims.Username != constants.Username {
-	//		response.HandleError(resp, errors.Errorf("reset password: verify token err, invalid token"))
-	//		return
-	//	}
-	//
-	//}
 
 	// Reset Password
 	//user.Spec.EncryptedPassword = passwordReset.Password
@@ -444,7 +381,7 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 
 		// init completed, user's wizard will be closed
 		go func() {
-			kubeClient := runtime.NewKubeClient(req)
+			kubeClient := runtime.NewKubeClientOrDie()
 			deploy := kubeClient.Kubernetes().AppsV1().Deployments(constants.Namespace)
 			ctx := context.Background()
 			wizard, err := deploy.Get(ctx, "wizard", metav1.GetOptions{})
@@ -461,7 +398,7 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 
 			klog.Info("success to delete wizard")
 		}()
-		_, err = iamClient.Users().Update(ctx, user, metav1.UpdateOptions{})
+		err = h.ctrlClient.Update(req.Request.Context(), &user)
 		if err != nil {
 			response.HandleError(resp, errors.Errorf("reset password: update user err, %v", err))
 			return
@@ -550,15 +487,6 @@ func (h *Handler) unlockUserCreating() {
 	h.userCreatingCount.Store(0)
 }
 
-func (h *Handler) tryUserCreating(resp *restful.Response) bool {
-	if h.userCreatingCount.Load() >= 0 {
-		return true
-	} else {
-		response.HandleForbidden(resp, errors.New("user create: forbidden by system"))
-		return false
-	}
-}
-
 func (h *Handler) handleGetUserMetrics(req *restful.Request, resp *restful.Response) {
 	user := req.PathParameter("user")
 	token := req.HeaderParameter(constants.AuthorizationTokenKey)
@@ -569,83 +497,4 @@ func (h *Handler) handleGetUserMetrics(req *restful.Request, resp *restful.Respo
 		response.HandleError(resp, err)
 	}
 	resp.WriteAsJson(r)
-}
-
-func IsAppInstallationRunning(token string) bool {
-	appServiceClient := app_service.NewAppServiceClient()
-	running, err := appServiceClient.GetInstallationRunningList(token)
-	if err != nil {
-		return true
-	}
-
-	return len(running) > 0
-}
-
-func (h *Handler) handleValidateUserPassword(req *restful.Request, resp *restful.Response) {
-	var userPassword UserPassword
-	if err := req.ReadEntity(&userPassword); err != nil {
-		response.HandleBadRequest(resp, errors.Errorf("validate password: %v", err))
-		return
-	}
-
-	if userPassword.Password == "" {
-		response.HandleError(resp, errors.New("validate password: new password is empty"))
-		return
-	}
-
-	_, err := auth.Login("http://lldap-service.os-platform:17170", userPassword.UserName, userPassword.Password)
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("validate password: verify password hash err, %v", err))
-		return
-	}
-
-	response.SuccessNoData(resp)
-}
-
-func (h *Handler) checkClusterPodCapacity(req *restful.Request) (bool, error) {
-	kClient := runtime.NewKubeClient(req)
-	nodes, err := kClient.Kubernetes().CoreV1().Nodes().List(req.Request.Context(), metav1.ListOptions{})
-	if err != nil {
-		return false, err
-	}
-	var currentPodNum, maxPodNum int64
-	nodeMap := sets.String{}
-	for _, node := range nodes.Items {
-		if !IsNodeReady(&node) || node.Spec.Unschedulable {
-			continue
-		}
-		pods, _ := node.Status.Capacity.Pods().AsInt64()
-		maxPodNum += pods
-		nodeMap.Insert(node.Name)
-	}
-
-	pods, err := kClient.Kubernetes().CoreV1().Pods(corev1.NamespaceAll).List(req.Request.Context(), metav1.ListOptions{})
-	if err != nil {
-		return false, err
-	}
-	for _, pod := range pods.Items {
-		if IsPodActive(&pod) && (nodeMap.Has(pod.Spec.NodeName) || pod.Status.Phase == corev1.PodPending) {
-			currentPodNum++
-		}
-	}
-	klog.Infof("currentPodNum :%v", currentPodNum)
-	if currentPodNum+minPodNumPerUser > maxPodNum-reservedPodNumForUser {
-		return false, nil
-	}
-	return true, nil
-}
-
-func IsPodActive(p *corev1.Pod) bool {
-	return corev1.PodSucceeded != p.Status.Phase &&
-		corev1.PodFailed != p.Status.Phase &&
-		p.DeletionTimestamp == nil
-}
-
-func IsNodeReady(node *corev1.Node) bool {
-	for _, c := range node.Status.Conditions {
-		if c.Type == corev1.NodeReady {
-			return c.Status == corev1.ConditionTrue
-		}
-	}
-	return false
 }

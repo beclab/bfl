@@ -9,9 +9,6 @@ import (
 	"strings"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/api/response"
 	"bytetrade.io/web3os/bfl/pkg/apis"
@@ -24,12 +21,15 @@ import (
 	settingsTask "bytetrade.io/web3os/bfl/pkg/task/settings"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
+
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 )
 
 type Handler struct {
@@ -48,7 +48,7 @@ func New() *Handler {
 }
 
 func (h *Handler) handleUnbindingUserZone(req *restful.Request, resp *restful.Response) {
-	ctx, k8sClient := req.Request.Context(), runtime.NewKubeClient(req).Kubernetes()
+	ctx, k8sClient := req.Request.Context(), runtime.NewKubeClientOrDie().Kubernetes()
 
 	// delete user annotations
 	userOp, err := operator.NewUserOperator()
@@ -295,9 +295,9 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 	namespace := utils.EnvOrDefault("L4_PROXY_NAMESPACE", constants.OSSystemNamespace)
 	serviceAccount := utils.EnvOrDefault("L4_PROXY_SERVICE_ACCOUNT", constants.L4ProxyServiceAccountName)
 
-	k8sClient := runtime.NewKubeClient(req).Kubernetes()
+	k8sClient := runtime.NewKubeClientOrDie()
 
-	app, err := k8sClient.AppsV1().Deployments(namespace).Get(ctx, L4ProxyDeploymentName, metav1.GetOptions{})
+	app, err := k8sClient.Kubernetes().AppsV1().Deployments(namespace).Get(ctx, L4ProxyDeploymentName, metav1.GetOptions{})
 	portStr := utils.EnvOrDefault("L4_PROXY_LISTEN", constants.L4ListenSSLPort)
 	if (err != nil && apierrors.IsNotFound(err)) || app == nil {
 		log.Warnf("get l4-proxy deployment err: %v, recreate it", err)
@@ -309,7 +309,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		// create proxy deployment
 		proxyApply := NewL4ProxyDeploymentApplyConfiguration(namespace, serviceAccount, portInt)
 		var createdProxy *appsv1.Deployment
-		createdProxy, err = k8sClient.AppsV1().Deployments(namespace).Apply(ctx,
+		createdProxy, err = k8sClient.Kubernetes().AppsV1().Deployments(namespace).Apply(ctx,
 			&proxyApply, metav1.ApplyOptions{Force: true, FieldManager: constants.ApplyPatchFieldManager})
 		if err != nil {
 			response.HandleError(resp, errors.Errorf("enable https: apply l4 proxy deployment err, %v", err))

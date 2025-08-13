@@ -5,13 +5,13 @@ import (
 
 	"bytetrade.io/web3os/bfl/pkg/constants"
 
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	applyCorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	applyMetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/pointer"
-	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 )
 
 type UserCreateOption struct {

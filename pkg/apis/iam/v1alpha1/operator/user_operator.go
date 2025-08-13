@@ -9,11 +9,11 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/client/dynamic_client/users"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
-	"kubesphere.io/kubesphere/pkg/server/errors"
 )
 
 type UserOperator struct {

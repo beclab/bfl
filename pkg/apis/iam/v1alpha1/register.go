@@ -8,9 +8,22 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	restfulspec "github.com/emicklei/go-restful-openapi/v2"
 	"github.com/emicklei/go-restful/v3"
+	aruntime "k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var (
+	scheme = aruntime.NewScheme()
+)
+
+func init() {
+	utilruntime.Must(iamV1alpha2.AddToScheme(scheme))
+}
 
 var ModuleVersion = runtime.ModuleVersion{Name: "iam", Version: "v1alpha1"}
 
@@ -22,8 +35,17 @@ var (
 
 func AddToContainer(c *restful.Container, addCallback func(func() error, func() error)) error {
 	ws := runtime.NewWebService(ModuleVersion)
-	handler := New()
-	
+	config, err := ctrl.GetConfig()
+	if err != nil {
+		return err
+	}
+	ctrlClient, err := client.New(config, client.Options{Scheme: scheme})
+	if err != nil {
+		return err
+	}
+
+	handler := New(ctrlClient)
+
 	ws.Route(ws.POST("/refresh-token").
 		To(handler.handleRefreshToken).
 		Doc("Refresh JWT token.").
@@ -75,15 +97,6 @@ func AddToContainer(c *restful.Container, addCallback func(func() error, func() 
 		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Produces(restful.MIME_JSON).
 		Returns(http.StatusOK, "", response.Response{}))
-	// TODO:hysyeah
-	//ws.Route(ws.POST("/validate").
-	//	To(handler.handleValidateUserPassword).
-	//	Doc("validate user.").
-	//	Metadata(restfulspec.KeyOpenAPITags, iamTags).
-	//	Reads(UserPassword{}).
-	//	Produces(restful.MIME_JSON).
-	//	Returns(http.StatusOK, "", response.Response{}))
-	// TODO:hysyeah
 
 	c.Add(ws)
 

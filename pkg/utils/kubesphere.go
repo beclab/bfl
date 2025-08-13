@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"kubesphere.io/kubesphere/pkg/simple/client/monitoring"
 )
 
 func GetCurrentResource(token string) (*v1alpha1.ClusterMetrics, error) {
@@ -71,6 +70,6 @@ func GetCurrentResource(token string) (*v1alpha1.ClusterMetrics, error) {
 	return &clusterMetrics, nil
 }
 
-func getValue(m *monitoring.Metric) float64 {
+func getValue(m *v1alpha1.Metric) float64 {
 	return m.MetricData.MetricValues[0].Sample[1]
 }

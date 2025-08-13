@@ -2,16 +2,10 @@ FROM golang:1.22.1 as builder
 
 WORKDIR /workspace
 
-ENV ksVersion=v3.3.0
-
 
 # Copy the Go Modules manifests
 COPY go.mod bytetrade.io/web3os/bfl-frpc/go.mod
 COPY go.sum bytetrade.io/web3os/bfl-frpc/go.sum
-
-RUN git clone https://github.com/beclab/kubesphere-ext.git bytetrade.io/kubesphere-ext && \
-  cd bytetrade.io/kubesphere-ext && \
-  git checkout -b $ksVersion
 
 
 RUN cd bytetrade.io/web3os/bfl-frpc && \

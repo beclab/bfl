@@ -16,8 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	"bytetrade.io/web3os/bfl/pkg/watchers/apps"
-
 	v1alpha1App "bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 	"bytetrade.io/web3os/bfl/internal/ingress/controllers/config"
 	ngx_template "bytetrade.io/web3os/bfl/internal/ingress/controllers/template"
@@ -27,7 +25,9 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/file"
+	"bytetrade.io/web3os/bfl/pkg/watchers/apps"
 
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"

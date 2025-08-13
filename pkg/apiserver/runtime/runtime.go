@@ -8,8 +8,6 @@ import (
 
 	"github.com/emicklei/go-restful/v3"
 	"github.com/form3tech-oss/jwt-go"
-	"k8s.io/client-go/rest"
-	kubejwt "kubesphere.io/kubesphere/pkg/apiserver/authentication/token"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -31,7 +29,7 @@ func NewWebService(mv ModuleVersion) *restful.WebService {
 	return &webservice
 }
 
-func NewKubeClientInCluster() (v1alpha1client.Client, error) {
+func NewKubeClientInCluster() (v1alpha1client.ClientInterface, error) {
 	config, err := ctrl.GetConfig()
 	if err != nil {
 		return nil, err
@@ -44,28 +42,20 @@ func NewKubeClientInCluster() (v1alpha1client.Client, error) {
 	return c, nil
 }
 
-func NewKubeClient(req *restful.Request) v1alpha1client.Client {
-	config := rest.Config{
-		Host:        constants.KubeSphereAPIHost,
-		BearerToken: req.HeaderParameter(constants.AuthorizationTokenKey),
-	}
-	return v1alpha1client.NewKubeClientOrDie("", &config)
+func NewKubeClient() (v1alpha1client.ClientInterface, error) {
+	return v1alpha1client.NewKubeClient(nil)
 }
 
-func NewKubeClientWithToken(token string) v1alpha1client.Client {
-	config := rest.Config{
-		Host:        constants.KubeSphereAPIHost,
-		BearerToken: token,
-	}
-	return v1alpha1client.NewKubeClientOrDie("", &config)
+func NewKubeClientOrDie() v1alpha1client.ClientInterface {
+	return v1alpha1client.NewKubeClientOrDie()
 }
 
-func ParseToken(tokenStr string) (*kubejwt.Claims, error) {
+func ParseToken(tokenStr string) (*Claims, error) {
 	if tokenStr == "" {
 		return nil, fmt.Errorf("parse token err, empty token string")
 	}
 
-	token, err := jwt.ParseWithClaims(tokenStr, &kubejwt.Claims{}, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
@@ -76,7 +66,7 @@ func ParseToken(tokenStr string) (*kubejwt.Claims, error) {
 		return nil, err
 	}
 
-	claims, ok := token.Claims.(*kubejwt.Claims)
+	claims, ok := token.Claims.(*Claims)
 	if ok && token.Valid && claims.Username != "" {
 		return claims, nil
 	}

@@ -1,17 +1,13 @@
 package v1alpha1
 
-import (
-	"kubesphere.io/kubesphere/pkg/simple/client/monitoring"
-)
-
 type ClusterMetrics struct {
-	CPU    MetricValue    `json:"cpu"`
-	Memory MetricValue    `json:"memory"`
-	Disk   MetricValue    `json:"disk"`
+	CPU    MetricV        `json:"cpu"`
+	Memory MetricV        `json:"memory"`
+	Disk   MetricV        `json:"disk"`
 	Net    MetricNetValue `json:"net"`
 }
 
-type MetricValue struct {
+type MetricV struct {
 	Total float64 `json:"total"`
 	Usage float64 `json:"usage"`
 	Ratio float64 `json:"ratio"`
@@ -24,14 +20,14 @@ type MetricNetValue struct {
 }
 
 type Metrics struct {
-	Results     []monitoring.Metric `json:"results" description:"actual array of results"`
-	CurrentPage int                 `json:"page,omitempty" description:"current page returned"`
-	TotalPages  int                 `json:"total_page,omitempty" description:"total number of pages"`
-	TotalItems  int                 `json:"total_item,omitempty" description:"page size"`
+	Results     []Metric `json:"results" description:"actual array of results"`
+	CurrentPage int      `json:"page,omitempty" description:"current page returned"`
+	TotalPages  int      `json:"total_page,omitempty" description:"total number of pages"`
+	TotalItems  int      `json:"total_item,omitempty" description:"page size"`
 }
 
-type Metadata struct {
-	Data []monitoring.Metadata `json:"data" description:"actual array of results"`
+type MetadataWrap struct {
+	Data []Metadata `json:"data" description:"actual array of results"`
 }
 
 type MetricLabelSet struct {

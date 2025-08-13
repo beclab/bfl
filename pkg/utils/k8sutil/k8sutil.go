@@ -6,13 +6,11 @@ import (
 	"net"
 	"time"
 
-	applyCorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	applyMetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
-
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/utils"
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -20,6 +18,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	applyCorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	applyMetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/pointer"
 )
 
@@ -76,8 +76,8 @@ func GetMasterExternalIP(ctx context.Context) *string {
 		return nil
 	}
 
-	users, err := kc.KubeSphere().IamV1alpha2().Users().
-		List(ctx, metav1.ListOptions{})
+	var users iamV1alpha2.UserList
+	err = kc.CtrlClient().List(ctx, &users)
 	if err != nil {
 		log.Warnf("list users: %v", err)
 		return nil

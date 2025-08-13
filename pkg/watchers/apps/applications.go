@@ -37,7 +37,7 @@ var GVR = schema.GroupVersionResource{
 
 type Subscriber struct {
 	*watchers.Subscriber
-	client        clientset.Client
+	client        clientset.ClientInterface
 	dynamicClient *dynamic_client.ResourceClient[appv1.Application]
 }
 
