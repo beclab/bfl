@@ -3,12 +3,13 @@ package v1alpha1
 import (
 	"sync"
 
+	"bytetrade.io/web3os/bfl/pkg/constants"
+
 	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	aruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-
 	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -74,6 +75,14 @@ func NewKubeClientOrDie() ClientInterface {
 		ctrlClient: ctrlClient,
 	}
 	return &k
+}
+
+func NewKubeClientWithToken(token string) (ClientInterface, error) {
+	config := rest.Config{
+		Host:        constants.KubeSphereAPIHost,
+		BearerToken: token,
+	}
+	return NewKubeClient(&config)
 }
 
 // NewKubeClient creates a Kubernetes and kubesphere client

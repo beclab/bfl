@@ -42,12 +42,8 @@ func NewKubeClientInCluster() (v1alpha1client.ClientInterface, error) {
 	return c, nil
 }
 
-func NewKubeClient() (v1alpha1client.ClientInterface, error) {
-	return v1alpha1client.NewKubeClient(nil)
-}
-
-func NewKubeClientOrDie() v1alpha1client.ClientInterface {
-	return v1alpha1client.NewKubeClientOrDie()
+func NewKubeClientWithToken(token string) (v1alpha1client.ClientInterface, error) {
+	return v1alpha1client.NewKubeClientWithToken(token)
 }
 
 func ParseToken(tokenStr string) (*Claims, error) {

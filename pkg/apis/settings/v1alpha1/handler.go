@@ -48,8 +48,13 @@ func New() *Handler {
 }
 
 func (h *Handler) handleUnbindingUserZone(req *restful.Request, resp *restful.Response) {
-	ctx, k8sClient := req.Request.Context(), runtime.NewKubeClientOrDie().Kubernetes()
+	ctx := req.Request.Context()
 
+	k8sClient, err := runtime.NewKubeClientWithToken(req.HeaderParameter(constants.AuthorizationTokenKey))
+	if err != nil {
+		response.HandleError(resp, errors.Wrap(err, "failed to get kube client"))
+		return
+	}
 	// delete user annotations
 	userOp, err := operator.NewUserOperator()
 	if err != nil {
@@ -83,20 +88,20 @@ func (h *Handler) handleUnbindingUserZone(req *restful.Request, resp *restful.Re
 	})
 
 	// remove frp-agent
-	if err = k8sClient.AppsV1().Deployments(constants.Namespace).Delete(ctx,
+	if err = k8sClient.Kubernetes().AppsV1().Deployments(constants.Namespace).Delete(ctx,
 		ReverseProxyAgentDeploymentName, metav1.DeleteOptions{}); err != nil {
 		log.Warnf("unbind user zone, delete frp-agent err, %v", err)
 	}
 
 	// delete ssl config
-	err = k8sClient.CoreV1().ConfigMaps(constants.Namespace).Delete(ctx,
+	err = k8sClient.Kubernetes().CoreV1().ConfigMaps(constants.Namespace).Delete(ctx,
 		constants.NameSSLConfigMapName, metav1.DeleteOptions{})
 	if err != nil {
 		log.Warnf("unbind user zone, delete ssl configmap err, %v", err)
 	}
 
 	// delete re download cert cronjob
-	err = k8sClient.BatchV1().CronJobs(constants.Namespace).Delete(ctx,
+	err = k8sClient.Kubernetes().BatchV1().CronJobs(constants.Namespace).Delete(ctx,
 		certmanager.ReDownloadCertCronJobName, metav1.DeleteOptions{})
 	if err != nil {
 		log.Warnf("unbind user zone, delete cronjob err, %v", err)
@@ -295,7 +300,12 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 	namespace := utils.EnvOrDefault("L4_PROXY_NAMESPACE", constants.OSSystemNamespace)
 	serviceAccount := utils.EnvOrDefault("L4_PROXY_SERVICE_ACCOUNT", constants.L4ProxyServiceAccountName)
 
-	k8sClient := runtime.NewKubeClientOrDie()
+	token := req.HeaderParameter(constants.AuthorizationTokenKey)
+	k8sClient, err := runtime.NewKubeClientWithToken(token)
+	if err != nil {
+		response.HandleError(resp, errors.Wrap(err, "failed to get kube client"))
+		return
+	}
 
 	app, err := k8sClient.Kubernetes().AppsV1().Deployments(namespace).Get(ctx, L4ProxyDeploymentName, metav1.GetOptions{})
 	portStr := utils.EnvOrDefault("L4_PROXY_LISTEN", constants.L4ListenSSLPort)

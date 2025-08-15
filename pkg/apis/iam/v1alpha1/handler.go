@@ -17,10 +17,7 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/lldap"
 	"bytetrade.io/web3os/bfl/pkg/task"
 	"bytetrade.io/web3os/bfl/pkg/task/settings"
-	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/httpclient"
-	"github.com/beclab/lldap-client/pkg/auth"
-
 	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/go-resty/resty/v2"
@@ -105,92 +102,6 @@ func (h *Handler) handleUserLogin(req *restful.Request, resp *restful.Response) 
 		return
 	}
 	response.Success(resp, token)
-}
-
-func (h *Handler) handleRefreshToken(req *restful.Request, resp *restful.Response) {
-	var pt PostRefreshToken
-	err := req.ReadEntity(&pt)
-	if err != nil {
-		response.HandleBadRequest(resp, errors.Errorf("refresh token: read entity err, %v", err))
-		return
-	}
-
-	if pt.Token == "" {
-		response.HandleBadRequest(resp, errors.New("refresh token: the token field must be provided"))
-		return
-	}
-
-	log.Infow("refresh token, read input", "refreshToken", pt)
-
-	newToken, err := auth.Refresh("http://lldap-service.os-platform:17170", pt.Token)
-	if err != nil {
-		resp.WriteHeaderAndEntity(http.StatusOK, response.Header{
-			Code:    -1,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	log.Infow("refresh token: generated new", "accessToken", newToken)
-
-	response.Success(resp, newToken)
-}
-
-func (h *Handler) handleUserLogOut(req *restful.Request, resp *restful.Response) {
-	token := req.HeaderParameter(constants.AuthorizationTokenKey)
-
-	_url := fmt.Sprintf("%s://%s%s", constants.KubeSphereAPIScheme, constants.KubeSphereAPIHost, kubeSphereAPILogout)
-	c := httpclient.New(&httpclient.Option{
-		Debug:   true,
-		Timeout: 15 * time.Second,
-	})
-
-	c.SetHeaders(map[string]string{
-		"Authorization": fmt.Sprintf("Bearer %s", token),
-		"content-type":  "application/json",
-		"x-client-ip":   utils.RemoteIp(req.Request),
-	})
-
-	respLogout, err := c.R().Get(_url)
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("logout user: %v", err))
-		return
-	}
-
-	respLogoutBytes := respLogout.Body()
-
-	log.Debugw("request user logout", "requestUrl", _url,
-		"requestHeader", c.Header,
-		"responseCode", respLogout.StatusCode(),
-		"responseBody", string(respLogoutBytes))
-
-	if respLogout.StatusCode() != http.StatusOK {
-		var e UnauthorizedError
-		if err = json.Unmarshal(respLogoutBytes, &e); err == nil {
-			response.HandleUnauthorized(resp, errors.Errorf("logout user: unmarshal response err: %v", e.Message))
-			return
-		}
-		response.HandleUnauthorized(resp, errors.Errorf("logout user: %v", string(respLogoutBytes)))
-		return
-	}
-
-	var v struct {
-		Message string `json:"message"`
-	}
-	if err = json.Unmarshal(respLogoutBytes, &v); err == nil &&
-		v.Message == response.SuccessMsg {
-
-		// send event to desktop
-		if err := h.eventClient.CreateEvent("settings-event", "user logout", map[string]string{
-			"user": constants.Username,
-		}); err != nil {
-			log.Errorf("send user logout event to desktop error, %v", err)
-		}
-
-		response.SuccessNoData(resp)
-		return
-	}
-	response.HandleInternalError(resp, errors.New(response.UnexpectedError))
 }
 
 func (h *Handler) getRolesByUserName(ctx context.Context, name string) ([]string, error) {
@@ -381,7 +292,11 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 
 		// init completed, user's wizard will be closed
 		go func() {
-			kubeClient := runtime.NewKubeClientOrDie()
+			kubeClient, err := runtime.NewKubeClientWithToken(token)
+			if err != nil {
+				klog.Errorf("get kubeClient failed %v", err)
+				return
+			}
 			deploy := kubeClient.Kubernetes().AppsV1().Deployments(constants.Namespace)
 			ctx := context.Background()
 			wizard, err := deploy.Get(ctx, "wizard", metav1.GetOptions{})

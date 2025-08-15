@@ -35,7 +35,6 @@ func (h *Handler) handleEnableService(req *restful.Request, resp *restful.Respon
 
 	// fetch token from request
 	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
-
 	res, err := h.appServiceClient.EnableSystemService(service, token)
 	if err != nil {
 		response.HandleError(resp, err)
@@ -48,7 +47,11 @@ func (h *Handler) handleEnableService(req *restful.Request, resp *restful.Respon
 		return
 	}
 
-	k8sClient := runtime.NewKubeClientOrDie()
+	k8sClient, err := runtime.NewKubeClientWithToken(token)
+	if err != nil {
+		response.HandleError(resp, fmt.Errorf("failed to get kube client %v", err))
+		return
+	}
 	go h.waitToNotify(service, ServiceEnabled, k8sClient)
 
 	response.SuccessNoData(resp)
@@ -76,7 +79,11 @@ func (h *Handler) handleDisableService(req *restful.Request, resp *restful.Respo
 		return
 	}
 
-	k8sClient := runtime.NewKubeClientOrDie()
+	k8sClient, err := runtime.NewKubeClientWithToken(token)
+	if err != nil {
+		response.HandleError(resp, fmt.Errorf("failed to get kube client %v", err))
+		return
+	}
 	go h.waitToNotify(service, ServiceDisabled, k8sClient)
 
 	response.SuccessNoData(resp)
@@ -84,7 +91,11 @@ func (h *Handler) handleDisableService(req *restful.Request, resp *restful.Respo
 
 func (h *Handler) handleGetServicesStatus(req *restful.Request, resp *restful.Response) {
 	var res ResponseServices
-	k8sClient := runtime.NewKubeClientOrDie()
+	k8sClient, err := runtime.NewKubeClientWithToken(req.HeaderParameter(constants.AuthorizationTokenKey))
+	if err != nil {
+		response.HandleError(resp, fmt.Errorf("failed to get kube client %v", err))
+		return
+	}
 	for _, s := range systemServices {
 		status, url, err := h.getServiceStatus(req, k8sClient, s)
 		if err != nil {

@@ -18,11 +18,15 @@ type IamUser struct {
 	kc v1alpha1client.ClientInterface
 }
 
-func NewIamUser() *IamUser {
+func NewIamUser() (*IamUser, error) {
+	kc, err := v1alpha1client.NewKubeClient(nil)
+	if err != nil {
+		return nil, err
+	}
 	return &IamUser{
 		ctx: context.Background(),
-		kc:  v1alpha1client.NewKubeClientOrDie(),
-	}
+		kc:  kc,
+	}, nil
 }
 
 func (u *IamUser) GetUser() (*v1alpha2.User, error) {

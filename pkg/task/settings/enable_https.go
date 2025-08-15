@@ -127,16 +127,24 @@ func NewEnableHTTPSTask(option *EnableHTTPSTaskOption) (*EnableHTTPSTask, error)
 	if option.WaitTimeout == nil {
 		option.WaitTimeout = pointer.Duration(defaultWaitTimeout)
 	}
+	iamUser, err := users.NewIamUser()
+	if err != nil {
+		return nil, err
+	}
+	kubeClient, err := runtime.NewKubeClientWithToken(option.AccessToken)
+	if err != nil {
+		return nil, err
+	}
 
 	t := &EnableHTTPSTask{
 		cm:         certmanager.NewCertManager(constants.TerminusName(option.Name)),
 		o:          option,
 		ctx:        context.TODO(),
-		iamUser:    users.NewIamUser(),
-		kubeClient: runtime.NewKubeClientOrDie(),
+		iamUser:    iamUser,
+		kubeClient: kubeClient,
 	}
 
-	err := t.UpdateTaskState(TaskResult{State: Pending})
+	err = t.UpdateTaskState(TaskResult{State: Pending})
 	return t, err
 }
 
