@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 	"encoding/json"
+	"k8s.io/klog/v2"
 	"math"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"kubesphere.io/kubesphere/pkg/simple/client/monitoring"
 )
 
 var UnitTypes = map[string]struct {
@@ -77,13 +77,14 @@ func (h *Handler) GetClusterMetric(req *restful.Request, resp *restful.Response)
 	var metrics Metrics
 	data, err := res.Raw()
 	if err != nil {
-		response.HandleError(resp, res.Error())
+		response.HandleError(resp, err)
 		return
 	}
+	klog.Infof("metricData: %s", string(data))
 
 	err = json.Unmarshal(data, &metrics)
 	if err != nil {
-		response.HandleError(resp, res.Error())
+		response.HandleError(resp, err)
 		return
 	}
 
@@ -120,14 +121,14 @@ func (h *Handler) GetClusterMetric(req *restful.Request, resp *restful.Response)
 	response.Success(resp, clusterMetrics)
 }
 
-func getValue(m *monitoring.Metric) float64 {
+func getValue(m *Metric) float64 {
 	if len(m.MetricData.MetricValues) == 0 {
 		return 0.0
 	}
 	return m.MetricData.MetricValues[0].Sample[1]
 }
 
-func fmtMetricsValue(v *MetricValue, unitType string) {
+func fmtMetricsValue(v *MetricV, unitType string) {
 	v.Ratio = math.Round((v.Usage / v.Total) * 100)
 
 	v.Unit = getSuitableUnit(v.Total, unitType)

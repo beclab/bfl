@@ -24,11 +24,11 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
 	"bytetrade.io/web3os/bfl/pkg/utils/k8sutil"
 
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
-	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 )
 
 type Handler struct {
@@ -219,7 +219,7 @@ func (h *Handler) handleReDownloadCert(req *restful.Request, resp *restful.Respo
 		terminusName string
 		op           *operator.UserOperator
 		user         *iamV1alpha2.User
-		client       v1alpha1.Client
+		client       v1alpha1.ClientInterface
 	)
 
 	log.Infow("expired re-download certificate", "force", force, "from", from)
@@ -536,7 +536,7 @@ func (h *Handler) getClusterMetric(req *restful.Request, resp *restful.Response)
 
 }
 
-func fmtMetricsValue(v *monitov1alpha1.MetricValue, unit string, unitFunc func(float64) float64) {
+func fmtMetricsValue(v *monitov1alpha1.MetricV, unit string, unitFunc func(float64) float64) {
 	v.Unit = unit
 
 	v.Usage = unitFunc(v.Usage)

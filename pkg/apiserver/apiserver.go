@@ -6,16 +6,13 @@ import (
 
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/api/response"
-	appProcessV1alpha1 "bytetrade.io/web3os/bfl/pkg/apis/app_process/v1alpha1"
-	appstorev1alpha1 "bytetrade.io/web3os/bfl/pkg/apis/app_store/v1alpha1"
 	backendv1 "bytetrade.io/web3os/bfl/pkg/apis/backend/v1"
 	callbackV1alpha1 "bytetrade.io/web3os/bfl/pkg/apis/callback/v1alpha1"
-	datastoreV1alpha1 "bytetrade.io/web3os/bfl/pkg/apis/datastore/v1alpha1"
+
 	iamV1alpha1 "bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1"
 	monitov1alpha1 "bytetrade.io/web3os/bfl/pkg/apis/monitor/v1alpha1"
 	settingsV1alpha1 "bytetrade.io/web3os/bfl/pkg/apis/settings/v1alpha1"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
-	"bytetrade.io/web3os/bfl/pkg/client/cache"
 	v1alpha1client "bytetrade.io/web3os/bfl/pkg/client/clientset/v1alpha1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 
@@ -32,9 +29,7 @@ type APIServer struct {
 
 	container *restful.Container
 
-	kubeClient v1alpha1client.Client
-
-	cacheClient cache.Interface
+	kubeClient v1alpha1client.ClientInterface
 }
 
 func New() (*APIServer, error) {
@@ -50,18 +45,6 @@ func New() (*APIServer, error) {
 	// jwt key
 	if err := s.initFetchKsJwtKey(); err != nil {
 		return nil, err
-	}
-	log.Infof("kubesphere jwt key: %q", string(constants.KubeSphereJwtKey))
-
-	// redis cache client
-	if redisOpts, err := s.newRedisOptions(); err != nil {
-		log.Warnf("new redis option err: %v", err)
-	} else {
-		log.Infow("new redis client", "options", redisOpts)
-
-		if err = cache.Init(redisOpts); err != nil {
-			log.Warnf("new redis cache err: %v", err)
-		}
 	}
 
 	server := &http.Server{
@@ -80,28 +63,6 @@ func (s *APIServer) initFetchKsJwtKey() error {
 	jwtSecretKey := secret.Data["lldap-jwt-secret"]
 	constants.KubeSphereJwtKey = jwtSecretKey
 	return nil
-}
-
-func (s *APIServer) newRedisOptions() (*cache.Options, error) {
-	o := &cache.Options{
-		Host: constants.KubeSphereCacheRedisHost,
-		Port: constants.KubeSphereCacheRedisPort,
-		DB:   constants.KubeSphereCacheRedisDB,
-	}
-
-	sc, err := s.kubeClient.Kubernetes().CoreV1().Secrets(constants.KubeSphereNamespace).
-		Get(context.TODO(), constants.KubeSphereRedisSecretName, metav1.GetOptions{})
-	if err != nil {
-		return nil, errors.Errorf("get redis secret, %v", err)
-	}
-
-	if auth, ok := sc.Data["auth"]; !ok {
-		return nil, errors.New("redis-secret no 'auth'")
-	} else {
-		o.Password = string(auth)
-		log.Infof("redis auth: %q", o.Password)
-	}
-	return o, nil
 }
 
 func (s *APIServer) PrepareRun() error {
@@ -154,11 +115,8 @@ func (s *APIServer) installAPIDocs() {
 
 func (s *APIServer) installModuleAPI() {
 	urlruntime.Must(callbackV1alpha1.AddToContainer(s.container))
-	urlruntime.Must(datastoreV1alpha1.AddToContainer(s.container))
 	urlruntime.Must(iamV1alpha1.AddToContainer(s.container, callbackV1alpha1.AddBackupCallbackHandler))
 	urlruntime.Must(backendv1.AddContainer(s.container))
-	urlruntime.Must(appProcessV1alpha1.AddToContainer(s.container))
-	urlruntime.Must(appstorev1alpha1.AddToContainer(s.container))
 	urlruntime.Must(settingsV1alpha1.AddContainer(s.container))
 	urlruntime.Must(monitov1alpha1.AddContainer(s.container))
 }

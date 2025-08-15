@@ -9,9 +9,6 @@ import (
 	"strings"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"bytetrade.io/web3os/bfl/internal/log"
 	"bytetrade.io/web3os/bfl/pkg/api/response"
 	"bytetrade.io/web3os/bfl/pkg/apis"
@@ -24,12 +21,15 @@ import (
 	settingsTask "bytetrade.io/web3os/bfl/pkg/task/settings"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
+
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 )
 
 type Handler struct {
@@ -37,7 +37,6 @@ type Handler struct {
 	appServiceClient *app_service.Client
 	httpClient       *resty.Client
 	eventClient      *event.Client
-	backupService    *BackupService
 }
 
 func New() *Handler {
@@ -45,13 +44,17 @@ func New() *Handler {
 		appServiceClient: app_service.NewAppServiceClient(),
 		httpClient:       resty.New().SetTimeout(30 * time.Second),
 		eventClient:      event.NewClient(),
-		backupService:    NewBackupService(),
 	}
 }
 
 func (h *Handler) handleUnbindingUserZone(req *restful.Request, resp *restful.Response) {
-	ctx, k8sClient := req.Request.Context(), runtime.NewKubeClient(req).Kubernetes()
+	ctx := req.Request.Context()
 
+	k8sClient, err := runtime.NewKubeClientWithToken(req.HeaderParameter(constants.AuthorizationTokenKey))
+	if err != nil {
+		response.HandleError(resp, errors.Wrap(err, "failed to get kube client"))
+		return
+	}
 	// delete user annotations
 	userOp, err := operator.NewUserOperator()
 	if err != nil {
@@ -85,20 +88,20 @@ func (h *Handler) handleUnbindingUserZone(req *restful.Request, resp *restful.Re
 	})
 
 	// remove frp-agent
-	if err = k8sClient.AppsV1().Deployments(constants.Namespace).Delete(ctx,
+	if err = k8sClient.Kubernetes().AppsV1().Deployments(constants.Namespace).Delete(ctx,
 		ReverseProxyAgentDeploymentName, metav1.DeleteOptions{}); err != nil {
 		log.Warnf("unbind user zone, delete frp-agent err, %v", err)
 	}
 
 	// delete ssl config
-	err = k8sClient.CoreV1().ConfigMaps(constants.Namespace).Delete(ctx,
+	err = k8sClient.Kubernetes().CoreV1().ConfigMaps(constants.Namespace).Delete(ctx,
 		constants.NameSSLConfigMapName, metav1.DeleteOptions{})
 	if err != nil {
 		log.Warnf("unbind user zone, delete ssl configmap err, %v", err)
 	}
 
 	// delete re download cert cronjob
-	err = k8sClient.BatchV1().CronJobs(constants.Namespace).Delete(ctx,
+	err = k8sClient.Kubernetes().BatchV1().CronJobs(constants.Namespace).Delete(ctx,
 		certmanager.ReDownloadCertCronJobName, metav1.DeleteOptions{})
 	if err != nil {
 		log.Warnf("unbind user zone, delete cronjob err, %v", err)
@@ -297,9 +300,14 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 	namespace := utils.EnvOrDefault("L4_PROXY_NAMESPACE", constants.OSSystemNamespace)
 	serviceAccount := utils.EnvOrDefault("L4_PROXY_SERVICE_ACCOUNT", constants.L4ProxyServiceAccountName)
 
-	k8sClient := runtime.NewKubeClient(req).Kubernetes()
+	token := req.HeaderParameter(constants.AuthorizationTokenKey)
+	k8sClient, err := runtime.NewKubeClientWithToken(token)
+	if err != nil {
+		response.HandleError(resp, errors.Wrap(err, "failed to get kube client"))
+		return
+	}
 
-	app, err := k8sClient.AppsV1().Deployments(namespace).Get(ctx, L4ProxyDeploymentName, metav1.GetOptions{})
+	app, err := k8sClient.Kubernetes().AppsV1().Deployments(namespace).Get(ctx, L4ProxyDeploymentName, metav1.GetOptions{})
 	portStr := utils.EnvOrDefault("L4_PROXY_LISTEN", constants.L4ListenSSLPort)
 	if (err != nil && apierrors.IsNotFound(err)) || app == nil {
 		log.Warnf("get l4-proxy deployment err: %v, recreate it", err)
@@ -311,7 +319,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		// create proxy deployment
 		proxyApply := NewL4ProxyDeploymentApplyConfiguration(namespace, serviceAccount, portInt)
 		var createdProxy *appsv1.Deployment
-		createdProxy, err = k8sClient.AppsV1().Deployments(namespace).Apply(ctx,
+		createdProxy, err = k8sClient.Kubernetes().AppsV1().Deployments(namespace).Apply(ctx,
 			&proxyApply, metav1.ApplyOptions{Force: true, FieldManager: constants.ApplyPatchFieldManager})
 		if err != nil {
 			response.HandleError(resp, errors.Errorf("enable https: apply l4 proxy deployment err, %v", err))

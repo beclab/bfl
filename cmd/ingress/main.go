@@ -11,8 +11,8 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	iamV1alpha2 "kubesphere.io/api/iam/v1alpha2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"

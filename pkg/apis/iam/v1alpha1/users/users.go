@@ -4,35 +4,43 @@ import (
 	"context"
 	"fmt"
 
-	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
+	v1alpha1client "bytetrade.io/web3os/bfl/pkg/client/clientset/v1alpha1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
+	"github.com/beclab/api/iam/v1alpha2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"kubesphere.io/api/iam/v1alpha2"
-	v1alpha2Clientset "kubesphere.io/kubesphere/pkg/client/clientset/versioned/typed/iam/v1alpha2"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type IamUser struct {
 	ctx context.Context
 
-	client v1alpha2Clientset.UserInterface
+	kc v1alpha1client.ClientInterface
 }
 
-func NewIamUser(token string) *IamUser {
-	c := runtime.NewKubeClientWithToken(token)
-	return &IamUser{
-		ctx:    context.Background(),
-		client: c.KubeSphere().IamV1alpha2().Users(),
+func NewIamUser() (*IamUser, error) {
+	kc, err := v1alpha1client.NewKubeClient(nil)
+	if err != nil {
+		return nil, err
 	}
+	return &IamUser{
+		ctx: context.Background(),
+		kc:  kc,
+	}, nil
 }
 
 func (u *IamUser) GetUser() (*v1alpha2.User, error) {
-	return u.client.Get(u.ctx, constants.Username, metav1.GetOptions{})
+	var user v1alpha2.User
+	err := u.kc.CtrlClient().Get(u.ctx, types.NamespacedName{Name: constants.Username}, &user)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func (u *IamUser) ListUsers() ([]v1alpha2.User, error) {
-	users, err := u.client.List(u.ctx, metav1.ListOptions{})
+	var users v1alpha2.UserList
+	err := u.kc.CtrlClient().List(u.ctx, &users)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +48,7 @@ func (u *IamUser) ListUsers() ([]v1alpha2.User, error) {
 }
 
 func (u *IamUser) UpdateUser(user *v1alpha2.User) error {
-	_, err := u.client.Update(u.ctx, user, metav1.UpdateOptions{})
+	err := u.kc.CtrlClient().Update(u.ctx, user)
 	return err
 }
 
