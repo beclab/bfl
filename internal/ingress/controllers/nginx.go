@@ -101,12 +101,12 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 			continue
 		}
 
-		entrancecounts := len(app.Spec.Entrances)
+		//entrancecounts := len(app.Spec.Entrances)
 		for index, entrance := range app.Spec.Entrances {
 			if entrance.Host == "" {
 				continue
 			}
-			prefix := getAppEntrancesHostName(entrancecounts, index, app.Spec.Name)
+			prefix := getAppEntrancesHostName(app.Spec.Entrances, index, app.Spec.Name)
 			customPrefixDomainName := ""
 
 			customDomainEntrancesMap, err := getSettingsMap(&app, constants.ApplicationCustomDomain)
@@ -117,7 +117,7 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 			customDomainEntranceMap, ok := customDomainEntrancesMap[entrance.Name]
 
 			if app.Spec.Appid != "" && !app.Spec.IsSysApp { // third-party application
-				prefix = getAppEntrancesHostName(entrancecounts, index, app.Spec.Appid)
+				prefix = getAppEntrancesHostName(app.Spec.Entrances, index, app.Spec.Appid)
 				if ok {
 					if customDomainEntranceMap != nil {
 						customPrefixDomainName = customDomainEntranceMap[constants.ApplicationThirdLevelDomain]

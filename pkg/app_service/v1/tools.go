@@ -15,7 +15,7 @@ import (
 )
 
 type URLGenerator func(appname, appid string) string
-type URLGeneratorMultiEntrance func(appname, appid string, index int) string
+type URLGeneratorMultiEntrance func(appname, appid string, index int, entrances []Entrance) string
 
 func AppUrlGenerator(req *restful.Request, user string) (URLGenerator, error) {
 	host := req.Request.Host
@@ -151,11 +151,14 @@ func AppUrlGeneratorMultiEntrance(req *restful.Request, user string) (URLGenerat
 				// the zone of the user's creator.
 				// At the meanwhile, the zone returned by the function is creator's zone.
 				klog.Info("new user: ", user)
-				appURL = func(appname, appid string, index int) string {
+				appURL = func(appname, appid string, index int, entrances []Entrance) string {
 					return fmt.Sprintf("%s%d-%s.%s", appid, index, user, zone)
 				}
 			} else {
-				appURL = func(appname, appid string, index int) string {
+				appURL = func(appname, appid string, index int, entrances []Entrance) string {
+					if appid == "ui" {
+						return fmt.Sprintf("%s.%s", entrances[index].Name, zone)
+					}
 					return fmt.Sprintf("%s%d.%s", appid, index, zone)
 				}
 			}
@@ -193,7 +196,7 @@ func AppUrlGeneratorMultiEntrance(req *restful.Request, user string) (URLGenerat
 			appUrlMap[sp.Name] = fmt.Sprintf("%s:%d", ip, sp.Port)
 		}
 
-		appURL = func(appname, appid string, index int) string {
+		appURL = func(appname, appid string, index int, entrances []Entrance) string {
 			url, ok := appUrlMap["app-"+appname]
 			if !ok {
 				klog.Errorf("app [ %s ]'s ServicePort not found !")

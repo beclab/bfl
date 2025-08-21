@@ -78,7 +78,11 @@ func (h *Base) GetAppListAndServicePort(req *restful.Request, appService *app_se
 		// filteredEntrances := make([]app_service.Entrance, 0)
 		for j := range apps[i].Entrances {
 			apps[i].Entrances[j].ID = fmt.Sprintf("%s%d", app.ID, j)
-			apps[i].Entrances[j].URL = appURLMulti(app.Name, app.ID, j)
+			if app.Name == "ui" {
+				apps[i].Entrances[j].ID = apps[i].Entrances[j].Name
+			}
+
+			apps[i].Entrances[j].URL = appURLMulti(app.Name, app.ID, j, apps[i].Entrances)
 			if apps[i].Entrances[j].Icon == "" {
 				apps[i].Entrances[j].Icon = app.Icon
 			}

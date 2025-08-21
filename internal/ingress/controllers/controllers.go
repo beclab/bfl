@@ -1007,9 +1007,12 @@ func getSettingsMap(app *v1alpha1App.Application, key string) (map[string]map[st
 	return r, nil
 }
 
-func getAppEntrancesHostName(entrancescount, index int, appid string) string {
-	if entrancescount == 1 {
+func getAppEntrancesHostName(entrances []v1alpha1App.Entrance, index int, appid string) string {
+	if len(entrances) == 1 {
 		return fmt.Sprintf("%s", appid)
+	}
+	if appid == "ui" {
+		return entrances[index].Name
 	}
 	return fmt.Sprintf("%s%d", appid, index)
 }
