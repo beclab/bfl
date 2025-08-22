@@ -60,8 +60,7 @@ var locationAdditionalsForFilesOp = func(node string) []string {
 }
 
 func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server) (*config.Server, error) {
-	var pods corev1.PodList
-	err := r.List(ctx, &pods, client.MatchingLabels{"app": "files"})
+	pods, err := r.getFilesPods(ctx)
 	if err != nil {
 		klog.Errorf("failed to list pods, %v", err)
 		return nil, err
@@ -74,19 +73,7 @@ func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server
 		return nil, err
 	}
 
-	masterNode := ""
-	podMap := map[string]*corev1.Pod{}
-	for _, node := range nodes.Items {
-		if _, ok := node.Labels["node-role.kubernetes.io/control-plane"]; ok {
-			masterNode = node.Name
-		}
-
-		for _, pod := range pods.Items {
-			if pod.Spec.NodeName == node.Name && pod.Labels["app"] == "files" {
-				podMap[node.Name] = &pod
-			}
-		}
-	}
+	masterNode, podMap := r.getFileserverPodMap(nodes, pods)
 
 	authRequest := config.Location{
 		Prefix:      "= /authelia-verify",
@@ -107,9 +94,6 @@ func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server
 	}
 
 	var apis []config.Location
-	var podUrl = func(pod *corev1.Pod) string {
-		return fmt.Sprintf("http://%s:80", pod.Status.PodIP)
-	}
 
 	var nodeLocationPrefix = []string{
 		"/api/resources/cache/",
@@ -143,13 +127,14 @@ func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server
 		"/api/task/",
 	}
 
-	for node, pod := range podMap {
+	for node := range podMap {
+		proxyCfg := ProxyServiceConfig{node}
 		for _, prefix := range nodeLocationPrefix {
 			nodeApi := config.Location{
 				Prefix:      fmt.Sprintf("%s%s/", prefix, node),
 				Additionals: locationAdditionalsForFilesOp(node),
 
-				ProxyPass:   podUrl(pod),
+				ProxyPass:   proxyCfg.ServiceHost(),
 				DirectProxy: true,
 			}
 
@@ -160,14 +145,15 @@ func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server
 
 	s.Locations = append(s.Locations, authRequest)
 
-	if masterPod, ok := podMap[masterNode]; ok {
+	if _, ok := podMap[masterNode]; ok {
 		var masterApis []config.Location
+		proxyCfg := ProxyServiceConfig{masterNode}
 		for _, l := range masterLocation {
 			masterApi := config.Location{
 				Prefix:      l,
 				Additionals: locationAdditionalsForFilesOp(masterNode),
 
-				ProxyPass:   podUrl(masterPod),
+				ProxyPass:   proxyCfg.ServiceHost(),
 				DirectProxy: true,
 			}
 
@@ -180,4 +166,27 @@ func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server
 	s.Locations = append(s.Locations, apis...)
 
 	return s, nil
+}
+
+func (r *NginxController) getFileserverPodMap(nodes corev1.NodeList, pods corev1.PodList) (masterNode string, podMap map[string]*corev1.Pod) {
+	podMap = make(map[string]*corev1.Pod)
+	for _, node := range nodes.Items {
+		if _, ok := node.Labels["node-role.kubernetes.io/control-plane"]; ok {
+			masterNode = node.Name
+		}
+
+		for _, pod := range pods.Items {
+			if pod.Spec.NodeName == node.Name && isFileServerPod(&pod) {
+				podMap[node.Name] = &pod
+			}
+		}
+	}
+
+	return
+}
+
+func (r *NginxController) getFilesPods(ctx context.Context) (corev1.PodList, error) {
+	var pods corev1.PodList
+	err := r.Client.List(ctx, &pods, client.MatchingLabels{"app": "files"})
+	return pods, err
 }

@@ -710,6 +710,11 @@ func (r *NginxController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	)
 
 	if req.Name == FILESERVER_CHANGED {
+		err = r.reconcileFileserverProvider(ctx)
+		if err != nil {
+			log.Error(err, "failed to reconcile fileserver provider")
+			return ctrl.Result{}, err
+		}
 		needRender = true
 	}
 
