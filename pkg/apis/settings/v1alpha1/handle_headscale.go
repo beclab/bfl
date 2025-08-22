@@ -42,7 +42,7 @@ type Acl struct {
 // settings' acl
 
 func (h *Handler) handleGetHeadscaleSshAcl(req *restful.Request, resp *restful.Response) {
-	app, err := h.findApp(req.Request.Context(), "settings")
+	app, err := h.findApp(req.Request.Context(), "ui")
 	if err != nil {
 		response.HandleError(resp, err)
 		return
@@ -68,7 +68,7 @@ func (h *Handler) handleGetHeadscaleSshAcl(req *restful.Request, resp *restful.R
 }
 
 func (h *Handler) handleDisableHeadscaleSshAcl(req *restful.Request, resp *restful.Response) {
-	app, err := h.findApp(req.Request.Context(), "settings")
+	app, err := h.findApp(req.Request.Context(), "ui")
 	if err != nil {
 		response.HandleError(resp, err)
 		return
@@ -81,18 +81,18 @@ func (h *Handler) handleDisableHeadscaleSshAcl(req *restful.Request, resp *restf
 		acls = append(acls, acl)
 	}
 
-	h.setHeadscaleAcl(req, resp, "settings", acls)
+	h.setHeadscaleAcl(req, resp, "ui", acls)
 }
 
 func (h *Handler) handleEnableHeadscaleSshAcl(req *restful.Request, resp *restful.Response) {
-	app, err := h.findApp(req.Request.Context(), "settings")
+	app, err := h.findApp(req.Request.Context(), "ui")
 	if err != nil {
 		response.HandleError(resp, err)
 		return
 	}
 	acls := app.Spec.TailScale.ACLs
 	acls = append(acls, apps.ACL{Proto: "tcp", Dst: []string{"*:22"}})
-	h.setHeadscaleAcl(req, resp, "settings", acls)
+	h.setHeadscaleAcl(req, resp, "ui", acls)
 }
 
 // app's acl
@@ -277,7 +277,7 @@ func calTailScaleSubnet() (subnets []string, err error) {
 }
 
 func (h *Handler) handleGetTailScaleSubnet(req *restful.Request, resp *restful.Response) {
-	app, err := h.findApp(req.Request.Context(), "settings")
+	app, err := h.findApp(req.Request.Context(), "ui")
 	if err != nil {
 		response.HandleError(resp, err)
 		return
@@ -295,12 +295,12 @@ func (h *Handler) handleEnableTailScaleSubnet(req *restful.Request, resp *restfu
 		response.HandleError(resp, err)
 		return
 	}
-	h.setTailScaleSubRoutes(req, resp, "settings", tailScaleSubRoutes)
+	h.setTailScaleSubRoutes(req, resp, "ui", tailScaleSubRoutes)
 }
 
 func (h *Handler) handleDisableTailScaleSubnet(req *restful.Request, resp *restful.Response) {
 	var tailScaleSubRoutes []string
-	h.setTailScaleSubRoutes(req, resp, "settings", tailScaleSubRoutes)
+	h.setTailScaleSubRoutes(req, resp, "ui", tailScaleSubRoutes)
 }
 
 func (h *Handler) setTailScaleSubRoutes(req *restful.Request, resp *restful.Response, appName string, subRoutes []string) {

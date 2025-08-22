@@ -7,6 +7,7 @@ import (
 
 	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
+	"bytetrade.io/web3os/bfl/pkg/utils"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/emicklei/go-restful/v3"
@@ -15,7 +16,7 @@ import (
 )
 
 type URLGenerator func(appname, appid string) string
-type URLGeneratorMultiEntrance func(appname, appid string, index int) string
+type URLGeneratorMultiEntrance func(appname, appid string, index int, entrances []Entrance, appDomainConfigs []utils.DefaultThirdLevelDomainConfig) string
 
 func AppUrlGenerator(req *restful.Request, user string) (URLGenerator, error) {
 	host := req.Request.Host
@@ -151,11 +152,17 @@ func AppUrlGeneratorMultiEntrance(req *restful.Request, user string) (URLGenerat
 				// the zone of the user's creator.
 				// At the meanwhile, the zone returned by the function is creator's zone.
 				klog.Info("new user: ", user)
-				appURL = func(appname, appid string, index int) string {
+				appURL = func(appname, appid string, index int, entrances []Entrance, appDomainConfigs []utils.DefaultThirdLevelDomainConfig) string {
 					return fmt.Sprintf("%s%d-%s.%s", appid, index, user, zone)
 				}
 			} else {
-				appURL = func(appname, appid string, index int) string {
+				appURL = func(appname, appid string, index int, entrances []Entrance, appDomainConfigs []utils.DefaultThirdLevelDomainConfig) string {
+					for _, adc := range appDomainConfigs {
+						if adc.EntranceName == entrances[index].Name && len(adc.ThirdLevelDomain) > 0 {
+							return fmt.Sprintf("%s.%s", adc.ThirdLevelDomain, zone)
+						}
+					}
+
 					return fmt.Sprintf("%s%d.%s", appid, index, zone)
 				}
 			}
@@ -193,7 +200,7 @@ func AppUrlGeneratorMultiEntrance(req *restful.Request, user string) (URLGenerat
 			appUrlMap[sp.Name] = fmt.Sprintf("%s:%d", ip, sp.Port)
 		}
 
-		appURL = func(appname, appid string, index int) string {
+		appURL = func(appname, appid string, index int, entrances []Entrance, appDomainConfigs []utils.DefaultThirdLevelDomainConfig) string {
 			url, ok := appUrlMap["app-"+appname]
 			if !ok {
 				klog.Errorf("app [ %s ]'s ServicePort not found !")

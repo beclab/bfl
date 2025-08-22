@@ -2,6 +2,7 @@ package apis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"bytetrade.io/web3os/bfl/pkg/api/response"
@@ -9,11 +10,13 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
+	"bytetrade.io/web3os/bfl/pkg/utils"
 
 	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 type Base struct {
@@ -74,11 +77,24 @@ func (h *Base) GetAppListAndServicePort(req *restful.Request, appService *app_se
 			continue
 		}
 
+		var appDomainConfigs []utils.DefaultThirdLevelDomainConfig
+		if len(app.DefaultThirdLevelDomainConfig) > 0 {
+			err := json.Unmarshal([]byte(app.DefaultThirdLevelDomainConfig), &appDomainConfigs)
+			if err != nil {
+				klog.Errorf("unmarshal defaultThirdLevelDomainConfig error %v", err)
+			}
+
+		}
 		// return all entrances, let the frontend filter invisible or not
 		// filteredEntrances := make([]app_service.Entrance, 0)
 		for j := range apps[i].Entrances {
 			apps[i].Entrances[j].ID = fmt.Sprintf("%s%d", app.ID, j)
-			apps[i].Entrances[j].URL = appURLMulti(app.Name, app.ID, j)
+			for _, adc := range appDomainConfigs {
+				if adc.EntranceName == apps[i].Entrances[j].Name && len(adc.ThirdLevelDomain) > 0 {
+					apps[i].Entrances[j].ID = adc.ThirdLevelDomain
+				}
+			}
+			apps[i].Entrances[j].URL = appURLMulti(app.Name, app.ID, j, apps[i].Entrances, appDomainConfigs)
 			if apps[i].Entrances[j].Icon == "" {
 				apps[i].Entrances[j].Icon = app.Icon
 			}

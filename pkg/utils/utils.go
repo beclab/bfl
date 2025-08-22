@@ -36,3 +36,9 @@ func ListContains[T comparable](items []T, v T) bool {
 func DashedOption(option string) string {
 	return fmt.Sprintf("-%s", option)
 }
+
+type DefaultThirdLevelDomainConfig struct {
+	AppName          string `json:"appName"`
+	EntranceName     string `json:"entranceName"`
+	ThirdLevelDomain string `json:"thirdLevelDomain"`
+}
