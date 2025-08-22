@@ -1007,13 +1007,16 @@ func getSettingsMap(app *v1alpha1App.Application, key string) (map[string]map[st
 	return r, nil
 }
 
-func getAppEntrancesHostName(entrances []v1alpha1App.Entrance, index int, appid string) string {
+func getAppEntrancesHostName(entrances []v1alpha1App.Entrance, index int, appid string, appDomainConfigs []utils.DefaultThirdLevelDomainConfig) string {
 	if len(entrances) == 1 {
 		return fmt.Sprintf("%s", appid)
 	}
-	if appid == "ui" {
-		return entrances[index].Name
+	for _, adc := range appDomainConfigs {
+		if adc.EntranceName == entrances[index].Name && len(adc.ThirdLevelDomain) > 0 {
+			return adc.ThirdLevelDomain
+		}
 	}
+
 	return fmt.Sprintf("%s%d", appid, index)
 }
 

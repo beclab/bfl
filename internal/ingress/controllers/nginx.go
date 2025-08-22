@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"bytetrade.io/web3os/bfl/internal/ingress/controllers/config"
@@ -100,13 +101,21 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 		if len(app.Spec.Entrances) == 0 {
 			continue
 		}
+		var appDomainConfigs []utils.DefaultThirdLevelDomainConfig
+		if len(app.Spec.Settings["defaultThirdLevelDomainConfig"]) > 0 {
+			err := json.Unmarshal([]byte(app.Spec.Settings["defaultThirdLevelDomainConfig"]), &appDomainConfigs)
+			if err != nil {
+				klog.Errorf("unmarshal defaultThirdLevelDomainConfig error %v", err)
+			}
+
+		}
 
 		//entrancecounts := len(app.Spec.Entrances)
 		for index, entrance := range app.Spec.Entrances {
 			if entrance.Host == "" {
 				continue
 			}
-			prefix := getAppEntrancesHostName(app.Spec.Entrances, index, app.Spec.Name)
+			prefix := getAppEntrancesHostName(app.Spec.Entrances, index, app.Spec.Name, appDomainConfigs)
 			customPrefixDomainName := ""
 
 			customDomainEntrancesMap, err := getSettingsMap(&app, constants.ApplicationCustomDomain)
@@ -117,7 +126,7 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 			customDomainEntranceMap, ok := customDomainEntrancesMap[entrance.Name]
 
 			if app.Spec.Appid != "" && !app.Spec.IsSysApp { // third-party application
-				prefix = getAppEntrancesHostName(app.Spec.Entrances, index, app.Spec.Appid)
+				prefix = getAppEntrancesHostName(app.Spec.Entrances, index, app.Spec.Appid, appDomainConfigs)
 				if ok {
 					if customDomainEntranceMap != nil {
 						customPrefixDomainName = customDomainEntranceMap[constants.ApplicationThirdLevelDomain]
