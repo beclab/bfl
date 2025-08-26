@@ -3,9 +3,10 @@ package v1alpha1
 import (
 	"context"
 	"encoding/json"
-	"k8s.io/klog/v2"
 	"math"
 	"time"
+
+	"k8s.io/klog/v2"
 
 	"bytetrade.io/web3os/bfl/pkg/api/response"
 	"bytetrade.io/web3os/bfl/pkg/constants"
@@ -44,7 +45,7 @@ func newHandler() *Handler {
 func (h *Handler) GetClusterMetric(req *restful.Request, resp *restful.Response) {
 	config := rest.Config{
 		Host:        constants.KubeSphereAPIHost,
-		BearerToken: req.HeaderParameter(constants.AuthorizationTokenKey),
+		BearerToken: req.HeaderParameter(constants.UserAuthorizationTokenKey),
 		APIPath:     "/kapis",
 		ContentConfig: rest.ContentConfig{
 			GroupVersion: &schema.GroupVersion{

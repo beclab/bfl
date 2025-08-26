@@ -63,20 +63,13 @@ func cors(req *restful.Request, resp *restful.Response, chain *restful.FilterCha
 
 func authenticate(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
 	// Ignore uris, because do not need authentication
-	needAuth, reqPath := true, req.Request.URL.Path
-	for _, p := range constants.RequestURLWhiteList {
-		if len(reqPath) >= len(p) && reqPath[:len(p)] == p {
-			needAuth = false
-			break
-		}
-	}
+	log.Debugw("request headers", "requestURL", req.Request.URL, "headers", req.Request.Header)
 
-	if needAuth {
-		log.Debugw("request headers", "requestURL", req.Request.URL, "headers", req.Request.Header)
-
-		tokenStr := req.HeaderParameter(constants.AuthorizationTokenKey)
+	user := req.HeaderParameter(constants.HeaderBflUserKey)
+	if user == "" {
+		tokenStr := req.HeaderParameter(constants.UserAuthorizationTokenKey)
 		if tokenStr == "" {
-			response.HandleUnauthorized(resp, response.NewTokenValidationError("token not provided"))
+			response.HandleUnauthorized(resp, response.NewTokenValidationError("user not found"))
 			return
 		}
 
@@ -86,20 +79,10 @@ func authenticate(req *restful.Request, resp *restful.Response, chain *restful.F
 			return
 		}
 
-		// check token is exists
-		//if cache.RedisClient != nil {
-		//	pattern := fmt.Sprintf("kubesphere:user:*:token:%s", tokenStr)
-		//	keys, err := cache.RedisClient.Keys(pattern)
-		//	if err == nil && len(keys) == 0 {
-		//		response.HandleError(resp, response.NewTokenValidationError("token not be found in cache"))
-		//		return
-		//	} else if err != nil {
-		//		log.Errorf("keys %q, err: %v", pattern, err)
-		//	}
-		//}
-
-		req.SetAttribute(constants.UserContextAttribute, claims.Username)
+		user = claims.Username
 	}
+
+	req.SetAttribute(constants.UserContextAttribute, user)
 
 	chain.ProcessFilter(req, resp)
 }

@@ -47,7 +47,7 @@ func New() *Handler {
 func (h *Handler) handleUnbindingUserZone(req *restful.Request, resp *restful.Response) {
 	ctx := req.Request.Context()
 
-	k8sClient, err := runtime.NewKubeClientWithToken(req.HeaderParameter(constants.AuthorizationTokenKey))
+	k8sClient, err := runtime.NewKubeClientWithToken(req.HeaderParameter(constants.UserAuthorizationTokenKey))
 	if err != nil {
 		response.HandleError(resp, errors.Wrap(err, "failed to get kube client"))
 		return
@@ -286,7 +286,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 	o := settingsTask.EnableHTTPSTaskOption{
 		Name:                                terminusName,
 		GenerateURL:                         fmt.Sprintf(constants.APIFormatCertGenerateRequest, terminusName),
-		AccessToken:                         req.HeaderParameter(constants.AuthorizationTokenKey),
+		AccessToken:                         req.HeaderParameter(constants.UserAuthorizationTokenKey),
 		ReverseProxyAgentDeploymentName:     ReverseProxyAgentDeploymentName,
 		ReverseProxyAgentDeploymentReplicas: ReverseProxyAgentDeploymentReplicas,
 		L4ProxyDeploymentName:               L4ProxyDeploymentName,
@@ -297,7 +297,7 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 	namespace := utils.EnvOrDefault("L4_PROXY_NAMESPACE", constants.OSSystemNamespace)
 	serviceAccount := utils.EnvOrDefault("L4_PROXY_SERVICE_ACCOUNT", constants.L4ProxyServiceAccountName)
 
-	token := req.HeaderParameter(constants.AuthorizationTokenKey)
+	token := req.HeaderParameter(constants.UserAuthorizationTokenKey)
 	k8sClient, err := runtime.NewKubeClientWithToken(token)
 	if err != nil {
 		response.HandleError(resp, errors.Wrap(err, "failed to get kube client"))

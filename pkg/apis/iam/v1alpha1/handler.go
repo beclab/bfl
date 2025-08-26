@@ -259,7 +259,7 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		response.HandleBadRequest(resp, errors.Errorf("reset password: %v", err))
 		return
 	}
-	token := req.HeaderParameter(constants.AuthorizationTokenKey)
+	token := req.HeaderParameter(constants.UserAuthorizationTokenKey)
 
 	if passwordReset.Password == "" {
 		response.HandleError(resp, errors.New("reset password: new password is empty"))
@@ -317,12 +317,12 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		}
 
 	}
-	url := fmt.Sprintf("http://authelia-backend.os-framework:9091/api/reset/%s/password", userName)
+	url := fmt.Sprintf("http://authelia-backend-provider.user-system-%s:28080/api/reset/%s/password", userName, userName)
 	client := resty.New()
 	res, err := client.R().
 		SetHeader("Content-Type", "application/json").
-		SetHeader("X-Authorization", token).
-		SetHeader("X-BFL-USER", userName).
+		SetHeader(constants.UserAuthorizationTokenKey, token).
+		SetHeader(constants.HeaderBflUserKey, userName).
 		SetBody(&passwordReset).
 		Post(url)
 	if err != nil {
@@ -401,7 +401,7 @@ func (h *Handler) unlockUserCreating() {
 
 func (h *Handler) handleGetUserMetrics(req *restful.Request, resp *restful.Response) {
 	user := req.PathParameter("user")
-	token := req.HeaderParameter(constants.AuthorizationTokenKey)
+	token := req.HeaderParameter(constants.UserAuthorizationTokenKey)
 	appServiceClient := app_service.NewAppServiceClient()
 
 	r, err := appServiceClient.GetUserMetrics(user, token)

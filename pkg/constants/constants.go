@@ -103,6 +103,8 @@ var (
 const (
 	envTerminusCertServiceAPI = "TERMINUS_CERT_SERVICE_API"
 	envTerminusDNSServiceAPI  = "TERMINUS_DNS_SERVICE_API"
+	UserAuthorizationTokenKey = "X-Authorization"
+	HeaderBflUserKey          = "X-BFL-USER"
 )
 
 var (

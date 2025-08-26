@@ -29,15 +29,6 @@ type PostLocale struct {
 	Theme string `json:"theme"`
 }
 
-func (b *Base) GetAppViaToken(req *restful.Request, appService *app_service.Client) (string, []*app_service.AppInfo, error) {
-	user := req.Attribute(constants.UserContextAttribute).(string)
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
-	apps, err := appService.ListAppInfosByOwner(token)
-
-	return user, apps, err
-
-}
-
 func (b *Base) GetAppViaOwner(appService *app_service.Client) (string, []*app_service.AppInfo, error) {
 	apps, err := appService.ListAppInfosByUser(constants.Username)
 
@@ -106,15 +97,6 @@ func (h *Base) GetAppListAndServicePort(req *restful.Request, appService *app_se
 	}
 
 	return apps, nil
-}
-
-func (b *Base) GetAllAppViaToken(req *restful.Request, appService *app_service.Client) (string, []*app_service.AppInfo, error) {
-	user := req.Attribute(constants.UserContextAttribute).(string)
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
-	apps, err := appService.ListAllAppInfosByAdmin(token)
-
-	return user, apps, err
-
 }
 
 func (b *Base) IsAdminUser(ctx context.Context) (bool, error) {

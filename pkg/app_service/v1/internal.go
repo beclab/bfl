@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"bytetrade.io/web3os/bfl/pkg/constants"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"k8s.io/klog/v2"
 )
@@ -231,6 +232,22 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 
 }
 
+func (c *Client) addTokenHeader(req *http.Request, token string) (*http.Request, error) {
+	if len(token) > 0 {
+		req.Header.Add(constants.UserAuthorizationTokenKey, token)
+	} else {
+		config, err := ctrl.GetConfig()
+		if err != nil {
+			klog.Error("get kube config error: ", err)
+			return nil, err
+		}
+
+		req.Header.Add(http.CanonicalHeaderKey("Authorization"), "Bearer "+config.BearerToken)
+	}
+
+	return req, nil
+}
+
 func (c *Client) doHttpGetResponse(urlStr, token string) (*http.Response, error) {
 	url, err := url.Parse(urlStr)
 	if err != nil {
@@ -239,11 +256,14 @@ func (c *Client) doHttpGetResponse(urlStr, token string) (*http.Response, error)
 
 	req := &http.Request{
 		Method: http.MethodGet,
-		Header: http.Header{
-			constants.AuthorizationTokenKey: []string{token},
-		},
-		URL: url,
+		URL:    url,
 	}
+
+	req, err = c.addTokenHeader(req, token)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		klog.Error("do request error: ", err)
@@ -331,7 +351,10 @@ func (c *Client) doHttpPost(urlStr, token string, bodydata interface{}) (map[str
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add(constants.AuthorizationTokenKey, token)
+	req, err = c.addTokenHeader(req, token)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Add("content-type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
