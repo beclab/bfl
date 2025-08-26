@@ -233,6 +233,9 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 }
 
 func (c *Client) addTokenHeader(req *http.Request, token string) (*http.Request, error) {
+	if req.Header == nil {
+		req.Header = make(http.Header)
+	}
 	if len(token) > 0 {
 		req.Header.Add(constants.UserAuthorizationTokenKey, token)
 	} else {
@@ -242,7 +245,7 @@ func (c *Client) addTokenHeader(req *http.Request, token string) (*http.Request,
 			return nil, err
 		}
 
-		req.Header.Add(http.CanonicalHeaderKey("Authorization"), "Bearer "+config.BearerToken)
+		req.Header.Add("Authorization", "Bearer "+config.BearerToken)
 	}
 
 	return req, nil

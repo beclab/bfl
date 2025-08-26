@@ -98,7 +98,7 @@ func (p *ProxyServiceConfig) ServiceNameSpace() string {
 }
 
 func (p *ProxyServiceConfig) ServiceHost() string {
-	return fmt.Sprintf("%s.%s.svc.cluster.local:28080", p.ServiceName(), p.ServiceNameSpace())
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local:28080", p.ServiceName(), p.ServiceNameSpace())
 }
 
 func (p *ProxyServiceConfig) Selector() map[string]string {
@@ -276,8 +276,8 @@ func (f *FileServerProviderConfig) UpsertFileServerRoleBinding(ctx context.Conte
 			},
 			Subjects: []rbacv1.Subject{
 				{
-					Kind:      "User",
-					Namespace: constants.Username,
+					Kind: "User",
+					Name: constants.Username,
 				},
 			},
 		}

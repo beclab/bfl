@@ -63,26 +63,36 @@ func cors(req *restful.Request, resp *restful.Response, chain *restful.FilterCha
 
 func authenticate(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
 	// Ignore uris, because do not need authentication
-	log.Debugw("request headers", "requestURL", req.Request.URL, "headers", req.Request.Header)
-
-	user := req.HeaderParameter(constants.HeaderBflUserKey)
-	if user == "" {
-		tokenStr := req.HeaderParameter(constants.UserAuthorizationTokenKey)
-		if tokenStr == "" {
-			response.HandleUnauthorized(resp, response.NewTokenValidationError("user not found"))
-			return
+	needAuth, reqPath := true, req.Request.URL.Path
+	for _, p := range constants.RequestURLWhiteList {
+		if len(reqPath) >= len(p) && reqPath[:len(p)] == p {
+			needAuth = false
+			break
 		}
-
-		claims, err := apiRuntime.ParseToken(tokenStr)
-		if err != nil {
-			response.HandleUnauthorized(resp, response.NewTokenValidationError("parse token", err))
-			return
-		}
-
-		user = claims.Username
 	}
 
-	req.SetAttribute(constants.UserContextAttribute, user)
+	if needAuth {
+		log.Debugw("request headers", "requestURL", req.Request.URL, "headers", req.Request.Header)
+
+		user := req.HeaderParameter(constants.HeaderBflUserKey)
+		if user == "" {
+			tokenStr := req.HeaderParameter(constants.UserAuthorizationTokenKey)
+			if tokenStr == "" {
+				response.HandleUnauthorized(resp, response.NewTokenValidationError("user not found"))
+				return
+			}
+
+			claims, err := apiRuntime.ParseToken(tokenStr)
+			if err != nil {
+				response.HandleUnauthorized(resp, response.NewTokenValidationError("parse token", err))
+				return
+			}
+
+			user = claims.Username
+		}
+
+		req.SetAttribute(constants.UserContextAttribute, user)
+	}
 
 	chain.ProcessFilter(req, resp)
 }
