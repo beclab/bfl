@@ -8,23 +8,24 @@ import (
 )
 
 type AppInfo struct {
-	ID              string        `json:"id"`
-	Name            string        `json:"name"`
-	Namespace       string        `json:"namespace"`
-	DeploymentName  string        `json:"deployment"`
-	Owner           string        `json:"owner"`
-	URL             string        `json:"url"`
-	Icon            string        `json:"icon"`
-	Title           string        `json:"title"`
-	Target          string        `json:"target"`
-	Entrances       []Entrance    `json:"entrances"`
-	Ports           []ServicePort `json:"ports"`
-	TailScaleACLs   []ACL         `json:"tailscaleAcls,omitempty"`
-	State           string        `json:"state"`
-	IsSysApp        bool          `json:"isSysApp"`
-	RequiredGpu     string        `json:"requiredGpu"`
-	IsClusterScoped bool          `json:"isClusterScoped"`
-	MobileSupported bool          `json:"mobileSupported"`
+	ID                            string        `json:"id"`
+	Name                          string        `json:"name"`
+	Namespace                     string        `json:"namespace"`
+	DeploymentName                string        `json:"deployment"`
+	Owner                         string        `json:"owner"`
+	URL                           string        `json:"url"`
+	Icon                          string        `json:"icon"`
+	Title                         string        `json:"title"`
+	Target                        string        `json:"target"`
+	Entrances                     []Entrance    `json:"entrances"`
+	Ports                         []ServicePort `json:"ports"`
+	TailScaleACLs                 []ACL         `json:"tailscaleAcls,omitempty"`
+	State                         string        `json:"state"`
+	IsSysApp                      bool          `json:"isSysApp"`
+	RequiredGpu                   string        `json:"requiredGpu"`
+	IsClusterScoped               bool          `json:"isClusterScoped"`
+	MobileSupported               bool          `json:"mobileSupported"`
+	DefaultThirdLevelDomainConfig string        `json:"defaultThirdLevelDomainConfig"`
 }
 
 type Entrance struct {

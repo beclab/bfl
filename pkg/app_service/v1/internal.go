@@ -56,7 +56,7 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 		isSysApp := appSpec["isSysApp"].(bool)
 
 		// get app settings to filter system service not to list
-		var title, target, state, requiredGPU string
+		var title, target, state, requiredGPU, defaultThirdLevelDomainConfig string
 		isClusterScoped, mobileSupported := false, false
 		settings, ok := appSpec["settings"]
 		if ok {
@@ -72,6 +72,9 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 			}
 			if t, ok := settingsMap["clusterScoped"]; ok && t == "true" {
 				isClusterScoped = true
+			}
+			if t, ok := settingsMap["defaultThirdLevelDomainConfig"]; ok {
+				defaultThirdLevelDomainConfig = t.(string)
 			}
 
 			if t, ok := settingsMap["target"]; ok {
@@ -203,22 +206,23 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 		}
 
 		res = append(res, &AppInfo{
-			ID:              genAppID(appSpec),
-			Name:            stringOrEmpty(appSpec["name"]),
-			Namespace:       stringOrEmpty(appSpec["namespace"]),
-			DeploymentName:  stringOrEmpty(appSpec["deployment"]),
-			Owner:           stringOrEmpty(appSpec["owner"]),
-			Icon:            stringOrEmpty(appSpec["icon"]),
-			Title:           title,
-			Target:          target,
-			Entrances:       appEntrances,
-			Ports:           appPorts,
-			TailScaleACLs:   appACLs,
-			State:           state,
-			IsSysApp:        isSysApp,
-			IsClusterScoped: isClusterScoped,
-			MobileSupported: mobileSupported,
-			RequiredGpu:     requiredGPU,
+			ID:                            genAppID(appSpec),
+			Name:                          stringOrEmpty(appSpec["name"]),
+			Namespace:                     stringOrEmpty(appSpec["namespace"]),
+			DeploymentName:                stringOrEmpty(appSpec["deployment"]),
+			Owner:                         stringOrEmpty(appSpec["owner"]),
+			Icon:                          stringOrEmpty(appSpec["icon"]),
+			Title:                         title,
+			Target:                        target,
+			Entrances:                     appEntrances,
+			Ports:                         appPorts,
+			TailScaleACLs:                 appACLs,
+			State:                         state,
+			IsSysApp:                      isSysApp,
+			IsClusterScoped:               isClusterScoped,
+			MobileSupported:               mobileSupported,
+			RequiredGpu:                   requiredGPU,
+			DefaultThirdLevelDomainConfig: defaultThirdLevelDomainConfig,
 		})
 
 	}
