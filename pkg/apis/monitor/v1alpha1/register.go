@@ -5,7 +5,6 @@ import (
 
 	"bytetrade.io/web3os/bfl/pkg/api/response"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
-	"bytetrade.io/web3os/bfl/pkg/constants"
 
 	restfulspec "github.com/emicklei/go-restful-openapi/v2"
 	"github.com/emicklei/go-restful/v3"
@@ -26,7 +25,6 @@ func AddContainer(c *restful.Container) error {
 		To(handler.GetClusterMetric).
 		Doc("get the cluster current metrics ( cpu, memory, disk ).").
 		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Param(ws.HeaderParameter(constants.AuthorizationTokenKey, "Auth token").Required(true)).
 		Returns(http.StatusOK, "", response.Response{}))
 
 	c.Add(ws)

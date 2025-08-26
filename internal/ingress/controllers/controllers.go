@@ -710,6 +710,11 @@ func (r *NginxController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	)
 
 	if req.Name == FILESERVER_CHANGED {
+		err = r.reconcileFileserverProvider(ctx)
+		if err != nil {
+			log.Error(err, "failed to reconcile fileserver provider")
+			return ctrl.Result{}, err
+		}
 		needRender = true
 	}
 
@@ -791,7 +796,7 @@ func (r *NginxController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			if app.Spec.Owner == constants.Username {
 				ownerApps = append(ownerApps, app)
 				existedCustomDomain := formatCustomDomain(app.Spec.Settings[constants.ApplicationCustomDomain])
-				if existedCustomDomain != nil && len(existedCustomDomain) > 0 {
+				if len(existedCustomDomain) > 0 {
 					customDomains = append(customDomains, existedCustomDomain...)
 				}
 			}
@@ -845,7 +850,7 @@ func (r *NginxController) isAppsChanged(apps []v1alpha1App.Application) bool {
 
 	for _, app := range apps {
 		cachedApp := getCachedApp(app.Name)
-		isDiff = cachedApp == nil || (cachedApp != nil && !reflect.DeepEqual(cachedApp.Spec, app.Spec))
+		isDiff = cachedApp == nil || !reflect.DeepEqual(cachedApp.Spec, app.Spec)
 		if isDiff {
 			break
 		}
@@ -1009,7 +1014,7 @@ func getSettingsMap(app *v1alpha1App.Application, key string) (map[string]map[st
 
 func getAppEntrancesHostName(entrances []v1alpha1App.Entrance, index int, appid string, appDomainConfigs []utils.DefaultThirdLevelDomainConfig) string {
 	if len(entrances) == 1 {
-		return fmt.Sprintf("%s", appid)
+		return appid
 	}
 	for _, adc := range appDomainConfigs {
 		if adc.EntranceName == entrances[index].Name && len(adc.ThirdLevelDomain) > 0 {

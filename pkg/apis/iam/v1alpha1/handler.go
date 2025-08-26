@@ -13,7 +13,6 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
-	"bytetrade.io/web3os/bfl/pkg/event/v1"
 	"bytetrade.io/web3os/bfl/pkg/lldap"
 	"bytetrade.io/web3os/bfl/pkg/task"
 	"bytetrade.io/web3os/bfl/pkg/task/settings"
@@ -47,7 +46,6 @@ var defaultGlobalRoles = []string{
 }
 
 type Handler struct {
-	eventClient       *event.Client
 	userCreatingCount *atomic.Int32
 	ctrlClient        client.Client
 }
@@ -63,7 +61,6 @@ func (ct *CommonTask) Execute() {
 
 func New(ctrlClient client.Client) *Handler {
 	return &Handler{
-		eventClient:       event.NewClient(),
 		userCreatingCount: &atomic.Int32{},
 		ctrlClient:        ctrlClient,
 	}
@@ -262,7 +259,7 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		response.HandleBadRequest(resp, errors.Errorf("reset password: %v", err))
 		return
 	}
-	token := req.HeaderParameter(constants.AuthorizationTokenKey)
+	token := req.HeaderParameter(constants.UserAuthorizationTokenKey)
 
 	if passwordReset.Password == "" {
 		response.HandleError(resp, errors.New("reset password: new password is empty"))
@@ -320,12 +317,12 @@ func (h *Handler) handleResetUserPassword(req *restful.Request, resp *restful.Re
 		}
 
 	}
-	url := fmt.Sprintf("http://authelia-backend.os-framework:9091/api/reset/%s/password", userName)
+	url := fmt.Sprintf("http://authelia-backend-provider.user-system-%s:28080/api/reset/%s/password", userName, userName)
 	client := resty.New()
 	res, err := client.R().
 		SetHeader("Content-Type", "application/json").
-		SetHeader("X-Authorization", token).
-		SetHeader("X-BFL-USER", userName).
+		SetHeader(constants.UserAuthorizationTokenKey, token).
+		SetHeader(constants.HeaderBflUserKey, userName).
 		SetBody(&passwordReset).
 		Post(url)
 	if err != nil {
@@ -404,7 +401,7 @@ func (h *Handler) unlockUserCreating() {
 
 func (h *Handler) handleGetUserMetrics(req *restful.Request, resp *restful.Response) {
 	user := req.PathParameter("user")
-	token := req.HeaderParameter(constants.AuthorizationTokenKey)
+	token := req.HeaderParameter(constants.UserAuthorizationTokenKey)
 	appServiceClient := app_service.NewAppServiceClient()
 
 	r, err := appServiceClient.GetUserMetrics(user, token)

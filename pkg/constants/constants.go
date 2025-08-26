@@ -19,8 +19,6 @@ var (
 
 	KubeSphereAPIScheme = "http"
 
-	AuthorizationTokenKey = "X-Authorization"
-
 	UserAppDataPath = "./appdata/launcher" // user app data pvc
 
 	UserContextAttribute = "UserName"
@@ -105,6 +103,8 @@ var (
 const (
 	envTerminusCertServiceAPI = "TERMINUS_CERT_SERVICE_API"
 	envTerminusDNSServiceAPI  = "TERMINUS_DNS_SERVICE_API"
+	UserAuthorizationTokenKey = "X-Authorization"
+	HeaderBflUserKey          = "X-BFL-USER"
 )
 
 var (

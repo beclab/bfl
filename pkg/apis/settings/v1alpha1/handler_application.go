@@ -26,6 +26,7 @@ import (
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -34,7 +35,7 @@ func (h *Handler) setupAppPolicy(req *restful.Request, resp *restful.Response) {
 	appname := req.PathParameter(ParamAppName)
 
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 
 	var policy app_service.ApplicationSettingsPolicy
 	err := req.ReadEntity(&policy)
@@ -62,7 +63,7 @@ func (h *Handler) getAppPolicy(req *restful.Request, resp *restful.Response) {
 	appname := req.PathParameter(ParamAppName)
 
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 
 	appServiceClient := app_service.NewAppServiceClient()
 
@@ -160,7 +161,7 @@ func (h *Handler) setupAppCustomDomain(req *restful.Request, resp *restful.Respo
 	entranceName := req.PathParameter(ParamEntranceName)
 
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 
 	customDomain := make(map[string]interface{})
 	data, err := io.ReadAll(req.Request.Body)
@@ -303,7 +304,6 @@ func (h *Handler) setupAppCustomDomain(req *restful.Request, resp *restful.Respo
 	}
 
 	response.Success(resp, ret)
-	return
 }
 
 func (h *Handler) listEntrancesWithCustomDomain(req *restful.Request, resp *restful.Response) {
@@ -360,14 +360,13 @@ func (h *Handler) listEntrancesWithCustomDomain(req *restful.Request, resp *rest
 		}
 	}
 	response.Success(resp, entrances)
-	return
 }
 
 func (h *Handler) finishAppCustomDomainCnameTarget(req *restful.Request, resp *restful.Response) {
 	appName := req.PathParameter(ParamAppName)
 	entranceName := req.PathParameter(ParamEntranceName)
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 	var err error
 
 	var settings app_service.ApplicationsSettings
@@ -422,14 +421,13 @@ func (h *Handler) finishAppCustomDomainCnameTarget(req *restful.Request, resp *r
 	}
 
 	response.Success(resp, nil)
-	return
 }
 
 func (h *Handler) getAppCustomDomain(req *restful.Request, resp *restful.Response) {
 	appname := req.PathParameter(ParamAppName)
 
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 
 	appServiceClient := app_service.NewAppServiceClient()
 	entrances, err := appServiceClient.GetAppEntrances(appname, token)
@@ -437,13 +435,19 @@ func (h *Handler) getAppCustomDomain(req *restful.Request, resp *restful.Respons
 		response.HandleError(resp, err)
 		return
 	}
-	if entrances == nil || len(entrances) == 0 {
+	if len(entrances) == 0 {
 		response.HandleError(resp, fmt.Errorf("app %s entrances not found", appname))
 		return
 	}
 
 	var zone string
 	_, zone, err = h.getUserInfo()
+	if err != nil {
+		klog.Errorf("getAppCustomDomain: get user info error %v", err)
+		response.HandleError(resp, err)
+		return
+	}
+
 	settings, err := appServiceClient.GetAppCustomDomain(appname, token)
 	if err != nil {
 		response.HandleError(resp, err)
@@ -483,7 +487,7 @@ func (h *Handler) getAppCustomDomain(req *restful.Request, resp *restful.Respons
 func (h *Handler) getAppEntrances(req *restful.Request, resp *restful.Response) {
 	appName := req.PathParameter(ParamAppName)
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 
 	appServiceClient := app_service.NewAppServiceClient()
 
@@ -500,7 +504,7 @@ func (h *Handler) setupAppAuthorizationLevel(req *restful.Request, resp *restful
 	entranceName := req.PathParameter(ParamEntranceName)
 
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 
 	authLevel := make(map[string]interface{})
 	data, err := io.ReadAll(req.Request.Body)
@@ -510,6 +514,11 @@ func (h *Handler) setupAppAuthorizationLevel(req *restful.Request, resp *restful
 	}
 	defer req.Request.Body.Close()
 	err = json.Unmarshal(data, &authLevel)
+	if err != nil {
+		klog.Errorf("setupAppAuthorizationLevel: unmarshal authLevel error %v, %s", err, data)
+		response.HandleError(resp, err)
+		return
+	}
 
 	settings := app_service.ApplicationsSettings{
 		app_service.ApplicationAuthorizationLevelKey: authLevel,
@@ -531,7 +540,7 @@ func (h *Handler) setupAppEntrancePolicy(req *restful.Request, resp *restful.Res
 	entranceName := req.PathParameter(ParamEntranceName)
 
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 
 	var policy app_service.ApplicationSettingsPolicy
 	err := req.ReadEntity(&policy)
@@ -712,7 +721,7 @@ func (h *Handler) setCustomDomainCnameStatus(sslStatus, hostnameStatus string) s
 
 func (h *Handler) applicationPermissionList(req *restful.Request, resp *restful.Response) {
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 
 	appServiceClient := app_service.NewAppServiceClient()
 
@@ -726,7 +735,7 @@ func (h *Handler) applicationPermissionList(req *restful.Request, resp *restful.
 
 func (h *Handler) getApplicationProviderList(req *restful.Request, resp *restful.Response) {
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 	appName := req.PathParameter(ParamAppName)
 
 	appServiceClient := app_service.NewAppServiceClient()
@@ -741,7 +750,7 @@ func (h *Handler) getApplicationProviderList(req *restful.Request, resp *restful
 
 func (h *Handler) getApplicationSubjectList(req *restful.Request, resp *restful.Response) {
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 	appName := req.PathParameter(ParamAppName)
 
 	appServiceClient := app_service.NewAppServiceClient()
@@ -758,7 +767,7 @@ func (h *Handler) applicationPermission(req *restful.Request, resp *restful.Resp
 	appName := req.PathParameter(ParamAppName)
 
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 
 	appServiceClient := app_service.NewAppServiceClient()
 
@@ -772,7 +781,7 @@ func (h *Handler) applicationPermission(req *restful.Request, resp *restful.Resp
 
 func (h *Handler) getProviderRegistry(req *restful.Request, resp *restful.Response) {
 	// fetch token from request
-	token := req.Request.Header.Get(constants.AuthorizationTokenKey)
+	token := req.Request.Header.Get(constants.UserAuthorizationTokenKey)
 
 	dataType := req.PathParameter(ParamDataType)
 	group := req.PathParameter(ParamGroup)

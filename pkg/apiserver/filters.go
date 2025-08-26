@@ -74,31 +74,24 @@ func authenticate(req *restful.Request, resp *restful.Response, chain *restful.F
 	if needAuth {
 		log.Debugw("request headers", "requestURL", req.Request.URL, "headers", req.Request.Header)
 
-		tokenStr := req.HeaderParameter(constants.AuthorizationTokenKey)
-		if tokenStr == "" {
-			response.HandleUnauthorized(resp, response.NewTokenValidationError("token not provided"))
-			return
+		user := req.HeaderParameter(constants.HeaderBflUserKey)
+		if user == "" {
+			tokenStr := req.HeaderParameter(constants.UserAuthorizationTokenKey)
+			if tokenStr == "" {
+				response.HandleUnauthorized(resp, response.NewTokenValidationError("user not found"))
+				return
+			}
+
+			claims, err := apiRuntime.ParseToken(tokenStr)
+			if err != nil {
+				response.HandleUnauthorized(resp, response.NewTokenValidationError("parse token", err))
+				return
+			}
+
+			user = claims.Username
 		}
 
-		claims, err := apiRuntime.ParseToken(tokenStr)
-		if err != nil {
-			response.HandleUnauthorized(resp, response.NewTokenValidationError("parse token", err))
-			return
-		}
-
-		// check token is exists
-		//if cache.RedisClient != nil {
-		//	pattern := fmt.Sprintf("kubesphere:user:*:token:%s", tokenStr)
-		//	keys, err := cache.RedisClient.Keys(pattern)
-		//	if err == nil && len(keys) == 0 {
-		//		response.HandleError(resp, response.NewTokenValidationError("token not be found in cache"))
-		//		return
-		//	} else if err != nil {
-		//		log.Errorf("keys %q, err: %v", pattern, err)
-		//	}
-		//}
-
-		req.SetAttribute(constants.UserContextAttribute, claims.Username)
+		req.SetAttribute(constants.UserContextAttribute, user)
 	}
 
 	chain.ProcessFilter(req, resp)
