@@ -20,22 +20,22 @@ var patches = map[string][]func(ctx context.Context, r *NginxController, s *conf
 	},
 }
 
-var locationAdditionalsCommon = func(node string) []string {
-	return []string{
-		"auth_request /authelia-verify;",
-		"auth_request_set $remote_token $upstream_http_remote_accesstoken;",
-		"proxy_set_header Remote-Accesstoken $remote_token;",
-		"proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;",
-		"proxy_set_header X-Forwarded-Host $host;",
-		"client_body_timeout 60s;",
-		"keepalive_timeout 75s;",
-		"proxy_read_timeout 60s;",
-		"proxy_send_timeout 60s;",
-		"proxy_set_header X-BFL-USER " + constants.Username + ";",
-		"proxy_set_header X-Authorization $http_x_authorization;",
-		"proxy_set_header X-Terminus-Node " + node + ";",
-	}
-}
+// var locationAdditionalsCommon = func(node string) []string {
+// 	return []string{
+// 		"auth_request /authelia-verify;",
+// 		"auth_request_set $remote_token $upstream_http_remote_accesstoken;",
+// 		"proxy_set_header Remote-Accesstoken $remote_token;",
+// 		"proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;",
+// 		"proxy_set_header X-Forwarded-Host $host;",
+// 		"client_body_timeout 60s;",
+// 		"keepalive_timeout 75s;",
+// 		"proxy_read_timeout 60s;",
+// 		"proxy_send_timeout 60s;",
+// 		"proxy_set_header X-BFL-USER " + constants.Username + ";",
+// 		"proxy_set_header X-Authorization $http_x_authorization;",
+// 		"proxy_set_header X-Terminus-Node " + node + ";",
+// 	}
+// }
 
 var locationAdditionalsForFilesOp = func(node string) []string {
 	return []string{

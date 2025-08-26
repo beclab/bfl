@@ -796,7 +796,7 @@ func (r *NginxController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			if app.Spec.Owner == constants.Username {
 				ownerApps = append(ownerApps, app)
 				existedCustomDomain := formatCustomDomain(app.Spec.Settings[constants.ApplicationCustomDomain])
-				if existedCustomDomain != nil && len(existedCustomDomain) > 0 {
+				if len(existedCustomDomain) > 0 {
 					customDomains = append(customDomains, existedCustomDomain...)
 				}
 			}
@@ -850,7 +850,7 @@ func (r *NginxController) isAppsChanged(apps []v1alpha1App.Application) bool {
 
 	for _, app := range apps {
 		cachedApp := getCachedApp(app.Name)
-		isDiff = cachedApp == nil || (cachedApp != nil && !reflect.DeepEqual(cachedApp.Spec, app.Spec))
+		isDiff = cachedApp == nil || !reflect.DeepEqual(cachedApp.Spec, app.Spec)
 		if isDiff {
 			break
 		}
@@ -1014,7 +1014,7 @@ func getSettingsMap(app *v1alpha1App.Application, key string) (map[string]map[st
 
 func getAppEntrancesHostName(entrancescount, index int, appid string) string {
 	if entrancescount == 1 {
-		return fmt.Sprintf("%s", appid)
+		return appid
 	}
 	return fmt.Sprintf("%s%d", appid, index)
 }

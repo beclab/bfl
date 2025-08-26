@@ -16,7 +16,6 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
-	"bytetrade.io/web3os/bfl/pkg/event/v1"
 	"bytetrade.io/web3os/bfl/pkg/task"
 	settingsTask "bytetrade.io/web3os/bfl/pkg/task/settings"
 	"bytetrade.io/web3os/bfl/pkg/utils"
@@ -36,14 +35,12 @@ type Handler struct {
 	apis.Base
 	appServiceClient *app_service.Client
 	httpClient       *resty.Client
-	eventClient      *event.Client
 }
 
 func New() *Handler {
 	return &Handler{
 		appServiceClient: app_service.NewAppServiceClient(),
 		httpClient:       resty.New().SetTimeout(30 * time.Second),
-		eventClient:      event.NewClient(),
 	}
 }
 
@@ -512,9 +509,7 @@ func (h *Handler) handleUpdateLauncherAccessPolicy(req *restful.Request, resp *r
 				}
 				_, ipNet, err := net.ParseCIDR(cidr)
 				if err != nil {
-					if err != nil {
-						return errors.Errorf("parse cidr err, %v", err)
-					}
+					return errors.Errorf("parse cidr err, %v", err)
 				}
 				ipCIDRs = append(ipCIDRs, ipNet.String())
 			}

@@ -283,9 +283,7 @@ func (h *Handler) handleGetTailScaleSubnet(req *restful.Request, resp *restful.R
 		return
 	}
 	subRoutes := make([]string, 0)
-	for _, r := range app.Spec.TailScale.SubRoutes {
-		subRoutes = append(subRoutes, r)
-	}
+	subRoutes = append(subRoutes, app.Spec.TailScale.SubRoutes...)
 	response.Success(resp, subRoutes)
 }
 

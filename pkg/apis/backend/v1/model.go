@@ -59,13 +59,3 @@ type OlaresInfo struct {
 type MyAppsParam struct {
 	IsLocal bool `json:"isLocal"`
 }
-
-type MyAppsProviderRequest struct {
-	Op       string      `json:"op"`
-	DataType string      `json:"datatype"`
-	Version  string      `json:"version"`
-	Group    string      `json:"group"`
-	Param    interface{} `json:"param,omitempty"`
-	Data     MyAppsParam `json:"data,omitempty"`
-	Token    string
-}

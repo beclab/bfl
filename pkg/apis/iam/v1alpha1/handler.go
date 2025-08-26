@@ -13,7 +13,6 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
-	"bytetrade.io/web3os/bfl/pkg/event/v1"
 	"bytetrade.io/web3os/bfl/pkg/lldap"
 	"bytetrade.io/web3os/bfl/pkg/task"
 	"bytetrade.io/web3os/bfl/pkg/task/settings"
@@ -47,7 +46,6 @@ var defaultGlobalRoles = []string{
 }
 
 type Handler struct {
-	eventClient       *event.Client
 	userCreatingCount *atomic.Int32
 	ctrlClient        client.Client
 }
@@ -63,7 +61,6 @@ func (ct *CommonTask) Execute() {
 
 func New(ctrlClient client.Client) *Handler {
 	return &Handler{
-		eventClient:       event.NewClient(),
 		userCreatingCount: &atomic.Int32{},
 		ctrlClient:        ctrlClient,
 	}

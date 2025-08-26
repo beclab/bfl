@@ -26,6 +26,7 @@ import (
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -303,7 +304,6 @@ func (h *Handler) setupAppCustomDomain(req *restful.Request, resp *restful.Respo
 	}
 
 	response.Success(resp, ret)
-	return
 }
 
 func (h *Handler) listEntrancesWithCustomDomain(req *restful.Request, resp *restful.Response) {
@@ -360,7 +360,6 @@ func (h *Handler) listEntrancesWithCustomDomain(req *restful.Request, resp *rest
 		}
 	}
 	response.Success(resp, entrances)
-	return
 }
 
 func (h *Handler) finishAppCustomDomainCnameTarget(req *restful.Request, resp *restful.Response) {
@@ -422,7 +421,6 @@ func (h *Handler) finishAppCustomDomainCnameTarget(req *restful.Request, resp *r
 	}
 
 	response.Success(resp, nil)
-	return
 }
 
 func (h *Handler) getAppCustomDomain(req *restful.Request, resp *restful.Response) {
@@ -437,13 +435,19 @@ func (h *Handler) getAppCustomDomain(req *restful.Request, resp *restful.Respons
 		response.HandleError(resp, err)
 		return
 	}
-	if entrances == nil || len(entrances) == 0 {
+	if len(entrances) == 0 {
 		response.HandleError(resp, fmt.Errorf("app %s entrances not found", appname))
 		return
 	}
 
 	var zone string
 	_, zone, err = h.getUserInfo()
+	if err != nil {
+		klog.Errorf("getAppCustomDomain: get user info error %v", err)
+		response.HandleError(resp, err)
+		return
+	}
+
 	settings, err := appServiceClient.GetAppCustomDomain(appname, token)
 	if err != nil {
 		response.HandleError(resp, err)
@@ -510,6 +514,11 @@ func (h *Handler) setupAppAuthorizationLevel(req *restful.Request, resp *restful
 	}
 	defer req.Request.Body.Close()
 	err = json.Unmarshal(data, &authLevel)
+	if err != nil {
+		klog.Errorf("setupAppAuthorizationLevel: unmarshal authLevel error %v, %s", err, data)
+		response.HandleError(resp, err)
+		return
+	}
 
 	settings := app_service.ApplicationsSettings{
 		app_service.ApplicationAuthorizationLevelKey: authLevel,

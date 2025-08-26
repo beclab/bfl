@@ -19,8 +19,6 @@ var (
 
 	KubeSphereAPIScheme = "http"
 
-	AuthorizationTokenKey = "X-Authorization"
-
 	UserAppDataPath = "./appdata/launcher" // user app data pvc
 
 	UserContextAttribute = "UserName"

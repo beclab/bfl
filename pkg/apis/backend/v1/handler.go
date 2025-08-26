@@ -461,13 +461,13 @@ func (h *Handler) handleOlaresInfo(req *restful.Request, resp *restful.Response)
 
 func (h *Handler) myapps(req *restful.Request, resp *restful.Response) {
 	// provider api
-	var opt MyAppsProviderRequest
+	var opt MyAppsParam
 	if err := req.ReadEntity(&opt); err != nil {
 		response.HandleError(resp, err)
 		return
 	}
 
-	req.SetAttribute(constants.MyAppsIsLocalKey, opt.Data.IsLocal)
+	req.SetAttribute(constants.MyAppsIsLocalKey, opt.IsLocal)
 
 	list, err := h.Base.GetAppListAndServicePort(req, h.appService,
 		func() (string, []*app_service.AppInfo, error) { return h.Base.GetAppViaOwner(h.appService) })
