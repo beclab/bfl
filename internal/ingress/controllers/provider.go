@@ -34,7 +34,7 @@ func (r *NginxController) reconcileFileserverProvider(ctx context.Context) error
 	_, podMap := r.getFileserverPodMap(nodes, pods)
 
 	var serviceList []string
-	var serviceNamespace string
+	serviceNamespace := (&ProxyServiceConfig{}).ServiceNameSpace()
 	for nodeName, pod := range podMap {
 		// create or update proxy service
 		config := &ProxyServiceConfig{nodeName}
@@ -63,7 +63,6 @@ func (r *NginxController) reconcileFileserverProvider(ctx context.Context) error
 		}
 
 		serviceList = append(serviceList, config.ServiceName())
-		serviceNamespace = config.ServiceNameSpace()
 	} // end of current nodes loop
 
 	// try to find file proxy of not existing nodes to delete
@@ -74,8 +73,10 @@ func (r *NginxController) reconcileFileserverProvider(ctx context.Context) error
 		return nil
 	}
 	for _, service := range currentServiceList.Items {
-		if strings.HasPrefix(service.Name, "files-") && !slices.Contains(serviceList, service.Name) {
-			klog.Info("Found orphaned service: %s", service.Name)
+		if strings.HasPrefix(service.Name, "files-") &&
+			FilesNodeService(service).IsFilesNodeService() &&
+			!slices.Contains(serviceList, service.Name) {
+			klog.Info("Found orphaned file node service: %s", service.Name)
 			err = r.Client.Delete(ctx, &service)
 			if err != nil {
 				klog.Errorf("failed to delete orphaned service %s, %v", service.Name, err)
@@ -140,6 +141,8 @@ func (p *ProxyServiceConfig) UpsertProxyService(ctx context.Context, c client.Cl
 				Ports:    p.Ports(),
 			},
 		}
+
+		FilesNodeService(proxyService).Wrap()
 		return c.Create(ctx, &proxyService)
 	}
 
@@ -164,6 +167,20 @@ func (p *ProxyServiceConfig) DeleteProxyService(ctx context.Context, c client.Cl
 	}
 
 	return c.Delete(ctx, &proxyService)
+}
+
+type FilesNodeService corev1.Service
+
+const fileServerNodeServiceAnnotation = "olare/files-node-server"
+
+func (f FilesNodeService) Wrap() {
+	f.Annotations = map[string]string{
+		fileServerNodeServiceAnnotation: "true",
+	}
+}
+
+func (f FilesNodeService) IsFilesNodeService() bool {
+	return f.Annotations[fileServerNodeServiceAnnotation] == "true"
 }
 
 type FileServerProviderConfig struct {
