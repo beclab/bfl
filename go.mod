@@ -8,7 +8,7 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535
 	github.com/beclab/api v0.0.0-20250707125039-268cccf7e81c
 	github.com/beclab/lldap-client v0.0.8
-	github.com/emicklei/go-restful v2.14.3+incompatible
+	github.com/emicklei/go-restful v2.16.0+incompatible
 	github.com/emicklei/go-restful-openapi/v2 v2.9.1
 	github.com/emicklei/go-restful/v3 v3.8.0
 	github.com/enobufs/go-nats v0.0.1
