@@ -381,7 +381,9 @@ func RequestToken(token string, data map[string]string) (*TokenResponse, int, er
 		if err != nil {
 			return nil, -1, errors.Errorf("parse access token err: %v", err)
 		}
-		t.ExpiresAt = claims.ExpiresAt
+		if claims.ExpiresAt != nil {
+			t.ExpiresAt = claims.ExpiresAt.Unix()
+		}
 		return &t, 200, nil
 	}
 	return nil, -1, err
