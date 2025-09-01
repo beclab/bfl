@@ -1,11 +1,11 @@
 package runtime
 
-import "github.com/form3tech-oss/jwt-go"
+import "github.com/golang-jwt/jwt/v5"
 
 type Type string
 
 type Claims struct {
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 	// Private Claim Names
 	// TokenType defined the type of the token
 	TokenType Type `json:"token_type,omitempty"`

@@ -7,7 +7,7 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/constants"
 
 	"github.com/emicklei/go-restful/v3"
-	"github.com/form3tech-oss/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -52,18 +52,15 @@ func ParseToken(tokenStr string) (*Claims, error) {
 	}
 
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-		}
 		return constants.KubeSphereJwtKey, nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
 	if err != nil {
 		return nil, err
 	}
 
 	claims, ok := token.Claims.(*Claims)
-	if ok && token.Valid && claims.Username != "" {
+	if ok && claims.Username != "" {
 		return claims, nil
 	}
 	return nil, fmt.Errorf("invalid token, or claims not match")
