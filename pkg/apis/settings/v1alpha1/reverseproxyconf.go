@@ -460,6 +460,10 @@ func newDefaultReverseProxyAgentDeploymentApplyConfiguration() *applyAppsv1.Depl
 					},
 				},
 				Spec: &applyCorev1.PodSpecApplyConfiguration{
+					PriorityClassName: func() *string {
+						name := "system-cluster-critical"
+						return &name
+					}(),
 					SchedulerName:      pointer.String("default-scheduler"),
 					ServiceAccountName: pointer.String("bytetrade-controller"),
 					Containers: []applyCorev1.ContainerApplyConfiguration{
