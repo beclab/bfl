@@ -385,7 +385,7 @@ func (r *NginxController) generateNginxServers() ([]config.Server, error) {
 			}
 
 			// server patches
-			if patches, ok := patches[app.Spec.Name]; ok {
+			if patches, ok := patches[entrance.Name]; ok {
 				for _, patch := range patches {
 					_, err = patch(ctx, r, &s)
 					if err != nil {

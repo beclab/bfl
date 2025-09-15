@@ -126,6 +126,7 @@ func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server
 		"/api/preview/external/",
 		"/api/paste/",
 		"/api/task/",
+		"/api/repos/",
 	}
 
 	for node := range podMap {
