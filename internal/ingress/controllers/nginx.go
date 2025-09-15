@@ -159,7 +159,7 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 			}
 
 			// server patches
-			if patches, ok := patches[app.Spec.Name]; ok {
+			if patches, ok := patches[prefix]; ok {
 				for _, patch := range patches {
 					_, err = patch(ctx, r, &s)
 					if err != nil {
