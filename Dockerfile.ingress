@@ -1,4 +1,4 @@
-FROM golang:1.22.1-bullseye as builder
+FROM golang:1.23.1-bullseye as builder
 
 WORKDIR /workspace
 
@@ -9,19 +9,19 @@ COPY go.sum bytetrade.io/web3os/bfl-ingress/go.sum
 
 
 RUN cd bytetrade.io/web3os/bfl-ingress && \
-    go mod download
+  go mod download
 
 
 # Copy the go project
 COPY . bytetrade.io/web3os/bfl-ingress/
 
 RUN cd bytetrade.io/web3os/bfl-ingress/ && \
-    CGO_ENABLED=0 go build -ldflags="-s -w" -a -o bfl-ingress cmd/ingress/main.go
+  CGO_ENABLED=0 go build -ldflags="-s -w" -a -o bfl-ingress cmd/ingress/main.go
 
 FROM bytetrade/openresty:1.25.3-otel
 
 RUN apt update && \
-    apt install -y --no-install-recommends gcc lua5.1 coreutils luarocks
+  apt install -y --no-install-recommends gcc lua5.1 coreutils luarocks
 RUN luarocks-5.1 install lua-resty-cookie 
 
 WORKDIR /
