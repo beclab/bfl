@@ -935,9 +935,9 @@ func (r *NginxController) SetupWithManager(mgr ctrl.Manager) error {
 				if !isFileServerPod(e.ObjectNew) {
 					return false
 				}
-				old, ok1 := e.ObjectOld.(*corev1.Pod)
-				_new, ok2 := e.ObjectNew.(*corev1.Pod)
-				if !(ok1 && ok2) || reflect.DeepEqual(old.Spec, _new.Spec) {
+				_, ok1 := e.ObjectOld.(*corev1.Pod)
+				_, ok2 := e.ObjectNew.(*corev1.Pod)
+				if !(ok1 && ok2) {
 					return false
 				}
 				return true
