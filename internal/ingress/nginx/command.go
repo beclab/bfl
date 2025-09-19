@@ -1,6 +1,7 @@
 package nginx
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"strconv"
@@ -19,6 +20,66 @@ const (
 type NginxCommand struct {
 	binary   string
 	confPath string
+	errorLog *errorLog
+}
+
+type errorLog struct {
+	latestLogs map[string]struct{} `json:"latest_logs"`
+}
+
+func (e *errorLog) load() error {
+	// read the last 100 lines of error log
+	//  tail -n 100 /var/log/nginx/error.log
+	out, err := exec.Command("tail", "-n", "100", "/var/log/nginx/error.log").CombinedOutput()
+	if err != nil {
+		return err
+	}
+
+	logs := strings.Split(string(out), "\n")
+	for _, log := range logs {
+		e.latestLogs[strings.TrimSpace(log)] = struct{}{}
+	}
+	return nil
+}
+
+func newErrlog() (*errorLog, error) {
+	errlog := &errorLog{
+		latestLogs: make(map[string]struct{}),
+	}
+	err := errlog.load()
+	return errlog, err
+}
+
+func hasNewError(newErrlog, oldErrorlog *errorLog) error {
+	if len(newErrlog.latestLogs) == 0 {
+		return nil
+	}
+
+	hasError := func(log string) bool {
+		return strings.Contains(log, "[emerg]") || strings.Contains(log, "[crit]")
+	}
+
+	if len(oldErrorlog.latestLogs) == 0 {
+		for log := range newErrlog.latestLogs {
+			if hasError(log) {
+				return errors.New("nginx error log detected: " + log)
+			}
+		}
+		return nil
+	}
+
+	// compare old error log with new error log
+	for log := range newErrlog.latestLogs {
+		if !hasError(log) {
+			continue
+		}
+
+		if _, exists := oldErrorlog.latestLogs[log]; !exists {
+			return errors.New("nginx error log detected: " + log)
+		}
+	}
+
+	return nil
 }
 
 // NewNginxCommand returns a new NginxCommand from which path
@@ -36,6 +97,12 @@ func NewNginxCommand() *NginxCommand {
 	ngxCfgPath := os.Getenv("NGINX_CONF_PATH")
 	if ngxCfgPath != "" {
 		command.confPath = ngxCfgPath
+	}
+
+	var err error
+	command.errorLog, err = newErrlog()
+	if err != nil {
+		klog.V(2).ErrorS(err, "load error log")
 	}
 	return &command
 }
@@ -62,7 +129,26 @@ func (n *NginxCommand) Test(cfg string) ([]byte, error) {
 }
 
 func (n *NginxCommand) Reload() ([]byte, error) {
-	return n.output("-s", "reload")
+	out, err := n.output("-s", "reload")
+	if err != nil {
+		return out, err
+	}
+
+	newErrlog, err := newErrlog()
+	if err != nil {
+		klog.V(2).ErrorS(err, "load error log")
+		return out, err
+	}
+
+	defer func() {
+		n.errorLog = newErrlog
+	}()
+
+	if err := hasNewError(newErrlog, n.errorLog); err != nil {
+		return out, err
+	}
+
+	return out, nil
 }
 
 func (n *NginxCommand) Quit() ([]byte, error) {
