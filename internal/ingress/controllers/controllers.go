@@ -371,7 +371,7 @@ func (r *NginxController) generateNginxServers() ([]config.Server, error) {
 			if entrance.Host == "" {
 				continue
 			}
-			appPortName := fmt.Sprintf("%s%s", constants.AppPortNamePrefix, app.Spec.Name)
+			appPortName := fmt.Sprintf("%s%s", constants.AppPortNamePrefix, entrance.Name)
 			appPort := latestAppPort(appPortName)
 
 			s := config.Server{
