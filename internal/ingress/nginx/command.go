@@ -24,7 +24,7 @@ type NginxCommand struct {
 }
 
 type errorLog struct {
-	latestLogs map[string]struct{} `json:"latest_logs"`
+	latestLogs map[string]struct{}
 }
 
 func (e *errorLog) load() error {
