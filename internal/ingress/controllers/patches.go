@@ -41,11 +41,13 @@ var locationAdditionalsForFilesOp = func(node string) []string {
 	return []string{
 		"auth_request /authelia-verify;",
 		"auth_request_set $remote_token $upstream_http_remote_accesstoken;",
+		"auth_request_set $authelia_nonce $upstream_http_authelia_nonce;",
 		"proxy_set_header Remote-Accesstoken $remote_token;",
 		"proxy_set_header X-Real-IP $remote_addr;",
 		"proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;",
 		"proxy_set_header X-Forwarded-Host $host;",
 		"proxy_set_header X-Provider-Proxy $proxy_host;",
+		"proxy_set_header Authelia-Nonce $authelia_nonce;",
 		"client_body_timeout 60s;",
 		"client_max_body_size 2000M;",
 		"proxy_request_buffering off;",
