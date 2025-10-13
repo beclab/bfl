@@ -2,7 +2,7 @@ package constants
 
 import (
 	"fmt"
-	"os"
+	"net/url"
 	"strings"
 )
 
@@ -75,9 +75,11 @@ var (
 )
 
 var (
-	apiPrefixCertService = "https://terminus-cert.snowinning.com"
+	OlaresRemoteService = "https://api.olares.com"
 
-	apiPrefixDNSService = "https://terminus-dnsop.snowinning.com"
+	APIPrefixCertService string
+
+	APIPrefixDNSOPService string
 
 	APIFormatCertGenerateRequest string
 
@@ -101,10 +103,9 @@ var (
 )
 
 const (
-	envTerminusCertServiceAPI = "TERMINUS_CERT_SERVICE_API"
-	envTerminusDNSServiceAPI  = "TERMINUS_DNS_SERVICE_API"
-	UserAuthorizationTokenKey = "X-Authorization"
-	HeaderBflUserKey          = "X-BFL-USER"
+	EnvOlaresSystemRemoteService = "OLARES_SYSTEM_REMOTE_SERVICE"
+	UserAuthorizationTokenKey    = "X-Authorization"
+	HeaderBflUserKey             = "X-BFL-USER"
 )
 
 var (
@@ -298,41 +299,35 @@ const (
 	Completed             WizardStatus = "completed"
 )
 
-func addHTTPSSchemePrefixIfNecessary(original string) string {
-	if !strings.HasPrefix(original, "https://") {
-		return "https://" + original
+func ReloadEnvDependantVars() error {
+	APIPrefixCertService, err := url.JoinPath(OlaresRemoteService, "/cert")
+	if err != nil {
+		return err
 	}
-	return original
-}
-
-func setOverridesFromEnv() {
-	if envVar := os.Getenv(envTerminusCertServiceAPI); envVar != "" {
-		apiPrefixCertService = addHTTPSSchemePrefixIfNecessary(envVar)
+	APIPrefixDNSOPService, err := url.JoinPath(OlaresRemoteService, "/dns/op")
+	if err != nil {
+		return err
 	}
-	if envVar := os.Getenv(envTerminusDNSServiceAPI); envVar != "" {
-		apiPrefixDNSService = addHTTPSSchemePrefixIfNecessary(envVar)
-	}
-}
 
-func initEnvDependantVars() {
-	APIFormatCertGenerateRequest = apiPrefixCertService + "/generate?" + nameParamters
+	APIFormatCertGenerateRequest = APIPrefixCertService + "/generate?" + nameParamters
 
-	APIFormatCertGenerateStatus = apiPrefixCertService + "/status?" + nameParamters
+	APIFormatCertGenerateStatus = APIPrefixCertService + "/status?" + nameParamters
 
-	APIFormatCertDownload = apiPrefixCertService + "/download?" + nameParamters
+	APIFormatCertDownload = APIPrefixCertService + "/download?" + nameParamters
 
-	APIDNSAddRecord = apiPrefixDNSService + "/adddnsrecord"
+	APIDNSAddRecord = APIPrefixDNSOPService + "/adddnsrecord"
 
-	APIFormatDNSDeleteRecord = apiPrefixDNSService + "/deldnsrecord?" + nameParamters
+	APIFormatDNSDeleteRecord = APIPrefixDNSOPService + "/deldnsrecord?" + nameParamters
 
-	APIDNSAddCustomDomain = apiPrefixDNSService + "/customhostname"
+	APIDNSAddCustomDomain = APIPrefixDNSOPService + "/customhostname"
 
-	APIDNSCheckCustomDomainCname = apiPrefixDNSService + "/checkcname"
+	APIDNSCheckCustomDomainCname = APIPrefixDNSOPService + "/checkcname"
 
-	APIDNSSetCloudFlareTunnel = apiPrefixDNSService + "/tunnel"
+	APIDNSSetCloudFlareTunnel = APIPrefixDNSOPService + "/tunnel"
+
+	return nil
 }
 
 func init() {
-	setOverridesFromEnv()
-	initEnvDependantVars()
+	ReloadEnvDependantVars()
 }
