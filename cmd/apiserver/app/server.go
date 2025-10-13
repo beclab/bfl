@@ -1,12 +1,14 @@
 package app
 
 import (
-	"bytetrade.io/web3os/bfl/pkg/watchers/reverse_proxy"
 	"context"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
 	"os"
 	"time"
+
+	"bytetrade.io/web3os/bfl/pkg/watchers/reverse_proxy"
+	"bytetrade.io/web3os/bfl/pkg/watchers/systemenv"
+	corev1 "k8s.io/api/core/v1"
 
 	"bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 	"bytetrade.io/web3os/bfl/internal/log"
@@ -89,6 +91,12 @@ func Run() error {
 	err = watchers.AddToWatchers[corev1.ConfigMap](w, reverse_proxy.GVR, reverseProxySubscriber.Handler())
 	if err != nil {
 		return fmt.Errorf("failed to add reverse proxy watcher: %w", err)
+	}
+	sysEnvSubscriber := systemenv.NewSubscriber(w)
+	// unstructured
+	err = watchers.AddToWatchers[map[string]interface{}](w, systemenv.GVR, sysEnvSubscriber.Handler())
+	if err != nil {
+		return fmt.Errorf("failed to add systemenv watcher: %w", err)
 	}
 	log.Info("start watchers")
 	go w.Run(1)
