@@ -11,11 +11,9 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/api"
 	"bytetrade.io/web3os/bfl/pkg/api/response"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
-	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
+	app_service "bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/lldap"
-	"bytetrade.io/web3os/bfl/pkg/task"
-	"bytetrade.io/web3os/bfl/pkg/task/settings"
 	"bytetrade.io/web3os/bfl/pkg/utils/httpclient"
 	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/emicklei/go-restful/v3"
@@ -48,15 +46,6 @@ var defaultGlobalRoles = []string{
 type Handler struct {
 	userCreatingCount *atomic.Int32
 	ctrlClient        client.Client
-}
-
-type CommonTask struct {
-	task.LocalTaskInterface
-	execFunc func()
-}
-
-func (ct *CommonTask) Execute() {
-	ct.execFunc()
 }
 
 func New(ctrlClient client.Client) *Handler {
@@ -182,12 +171,8 @@ func (h *Handler) handleListUsers(req *restful.Request, resp *restful.Response) 
 			u.LastLoginTime = pointer.Int64(user.Status.LastLoginTime.Unix())
 		}
 
-		if s, err := settings.GetEnableHTTPSTaskState(user.Name); err != nil {
-			log.Errorf("user '%s' get https task state err: %v", user.Name, err)
-		} else {
-			if s.State == settings.Succeeded {
-				u.WizardComplete = true
-			}
+		if status := user.Annotations[constants.UserTerminusWizardStatus]; status == string(constants.Completed) || status == string(constants.WaitResetPassword) {
+			u.WizardComplete = true
 		}
 
 		usersInfo = append(usersInfo, u)

@@ -72,12 +72,6 @@ func AddContainer(c *restful.Container) error {
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{}))
 
-	ws.Route(ws.GET("/ssl/task-state").
-		To(handler.handleGetEnableHTTPSTaskState).
-		Doc("Get enable https task state.").
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Returns(http.StatusOK, "", response.Response{}))
-
 	ws.Route(ws.GET("/launcher-acc-policy").
 		To(handler.handleGetLauncherAccessPolicy).
 		Doc("Get launcher access policy.").

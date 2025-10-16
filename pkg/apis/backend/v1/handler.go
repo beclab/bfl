@@ -19,7 +19,6 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/client/clientset/v1alpha1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
-	"bytetrade.io/web3os/bfl/pkg/task/settings"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
 	"bytetrade.io/web3os/bfl/pkg/utils/k8sutil"
@@ -145,12 +144,8 @@ func (h *Handler) handleUserInfo(req *restful.Request, resp *restful.Response) {
 		CreatedUser:  createdUser,
 	}
 
-	if s, err := settings.GetEnableHTTPSTaskState(user.Name); err != nil {
-		log.Warnf("get https state: user %q, %v", user.Name, err)
-	} else {
-		if s.State == settings.Succeeded {
-			uInfo.WizardComplete = true
-		}
+	if status := userOp.GetTerminusStatus(user); status == string(constants.Completed) || status == string(constants.WaitResetPassword) {
+		uInfo.WizardComplete = true
 	}
 
 	if accessLevel != nil {
