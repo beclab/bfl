@@ -47,9 +47,8 @@ type ReverseProxyConfigurator struct {
 
 type ReverseProxyConfig struct {
 	FRPConfig
-	IP                     string `json:"ip"`
-	EnableCloudFlareTunnel bool   `json:"enable_cloudflare_tunnel"`
-	EnableFRP              bool   `json:"enable_frp"`
+	EnableCloudFlareTunnel bool `json:"enable_cloudflare_tunnel"`
+	EnableFRP              bool `json:"enable_frp"`
 }
 
 type FRPConfig struct {
@@ -122,15 +121,12 @@ func (conf *ReverseProxyConfig) Check() error {
 		return errors.New("nil ReverseProxyConfig")
 	}
 	if conf.EnableCloudFlareTunnel {
-		if conf.IP != "" || conf.EnableFRP {
+		if conf.EnableFRP {
 			return errors.New("only one of public IP, FRP, or CloudFlare tunnel should be selected")
 		}
 		return nil
 	}
 	if conf.EnableFRP {
-		if conf.IP != "" {
-			return errors.New("only one of public IP, FRP, or CloudFlare tunnel should be selected")
-		}
 		if conf.FRPServer == "" {
 			return errors.New("FRP server is not provided")
 		}
@@ -139,9 +135,12 @@ func (conf *ReverseProxyConfig) Check() error {
 		}
 		return nil
 	}
-	if conf.IP == "" {
-		return errors.New("one of public IP, FRP, or CloudFlare tunnel should be selected")
-	}
+	// as long as both FRP and cloudflare tunnel are not enabled,
+	// consider it as a public IP
+	// no matter whether the specific IP address is provided (it shouldn't have been provided by the frontend before in the first place)
+	// if conf.IP == "" {
+	// 	return errors.New("one of public IP, FRP, or CloudFlare tunnel should be selected")
+	// }
 	return nil
 }
 
@@ -365,8 +364,8 @@ func (configurator *ReverseProxyConfigurator) Configure(ctx context.Context) (er
 	localIP = *localL4ProxyIP
 	localPort := utils.EnvOrDefault("L4_PROXY_LISTEN", constants.L4ListenSSLPort)
 
-	if conf.IP != "" {
-		publicIP = conf.IP
+	if !conf.EnableCloudFlareTunnel && !conf.EnableFRP {
+		// the public IP DNS record is handled by the ip watching mechanism
 		// delete the reverse proxy agent, if existing
 		err := configurator.kubeClient.AppsV1().Deployments(constants.Namespace).Delete(ctx, ReverseProxyAgentDeploymentName, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -510,7 +509,6 @@ func setReverseProxyAgentDeploymentToCloudFlare(deployConf *applyAppsv1.Deployme
 }
 
 func (conf *ReverseProxyConfig) readFromReverseProxyConfigMapData(cmData map[string]string) error {
-	conf.IP = cmData[ReverseProxyConfigKeyPublicIP]
 	if cmData[ReverseProxyConfigKeyCloudFlareEnable] == ReverseProxyConfigValueEnabled {
 		conf.EnableCloudFlareTunnel = true
 		// don't break circuit here or at the above public ip logic
@@ -535,7 +533,6 @@ func (conf *ReverseProxyConfig) readFromReverseProxyConfigMapData(cmData map[str
 
 func (conf *ReverseProxyConfig) generateReverseProxyConfigMapData() map[string]string {
 	cmData := make(map[string]string)
-	cmData[ReverseProxyConfigKeyPublicIP] = conf.IP
 	if conf.EnableCloudFlareTunnel {
 		cmData[ReverseProxyConfigKeyCloudFlareEnable] = ReverseProxyConfigValueEnabled
 	}
@@ -549,19 +546,6 @@ func (conf *ReverseProxyConfig) generateReverseProxyConfigMapData() map[string]s
 		cmData[ReverseProxyConfigKeyFRPAuthToken] = conf.FRPAuthToken
 	}
 	return cmData
-}
-
-func GetDefaultReverseProxyConfig(ctx context.Context) (*ReverseProxyConfig, error) {
-	namespace := utils.EnvOrDefault("L4_PROXY_NAMESPACE", constants.OSSystemNamespace)
-	configData, err := k8sutil.GetConfigMapData(ctx, namespace, constants.DefaultReverseProxyConfigMapName)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting configmap")
-	}
-	conf := &ReverseProxyConfig{}
-	if err := conf.readFromReverseProxyConfigMapData(configData); err != nil {
-		return nil, errors.Wrap(err, "error parsing default reverse proxy config data")
-	}
-	return conf, nil
 }
 
 func GetReverseProxyConfig(ctx context.Context) (*ReverseProxyConfig, error) {

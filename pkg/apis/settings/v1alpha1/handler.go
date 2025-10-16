@@ -167,71 +167,108 @@ func (h *Handler) handleBindingUserZone(req *restful.Request, resp *restful.Resp
 	response.SuccessNoData(resp)
 }
 
-func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response) {
+func (h *Handler) handleActivate(req *restful.Request, resp *restful.Response) {
 	ctx := req.Request.Context()
 
 	var terminusName string
 	userOp, err := operator.NewUserOperator()
 	if err != nil {
-		response.HandleError(resp, errors.Errorf("enable https: %v", err))
+		err = fmt.Errorf("activate system: failed to create user operator: %v", err)
+		klog.Error(err)
+		response.HandleError(resp, err)
 		return
 	}
 	user, err := userOp.GetUser("")
 	if err != nil {
-		response.HandleError(resp, errors.Errorf("enable https: %v", err))
+		err = fmt.Errorf("activate system: failed to get user: %v", err)
+		klog.Error(err)
+		response.HandleError(resp, err)
 		return
 	}
 
 	terminusName = userOp.GetTerminusName(user)
 	if terminusName == "" {
-		response.HandleError(resp, errors.Errorf("no olares name, please ensure olares name is bound first"))
+		response.HandleError(resp, errors.New("activate system: no olares name, please ensure olares name is bound first"))
 		return
 	}
-	if userOp.AnnotationExists(user, constants.UserAnnotationZoneKey) {
-		// already enabled, return success idempotently
+	if userOp.GetUserAnnotation(user, constants.UserAnnotationZoneKey) != "" || userOp.GetUserAnnotation(user, constants.UserTerminusWizardStatus) == string(constants.NetworkActivating) {
+		// already activated, or already in the process of activating, return success idempotently
 		response.SuccessNoData(resp)
 		return
 	}
 
-	post := EnableHTTPSRequest{}
-	req.ReadEntity(&post)
+	if userOp.GetUserAnnotation(user, constants.UserTerminusWizardStatus) == string(constants.NetworkActivateFailed) {
+		// all the settings already persisted, just retry without reading payload
+		if e := userOp.UpdateUser(user, []func(*iamV1alpha2.User){
+			func(u *iamV1alpha2.User) {
+				u.Annotations[constants.UserTerminusWizardStatus] = string(constants.NetworkActivating)
+			},
+		}); e != nil {
+			err = fmt.Errorf("activate system: failed to mark status as activating: %v", e)
+			klog.Error(err)
+			response.HandleError(resp, err)
+			return
+		}
+		response.SuccessNoData(resp)
+		return
+	}
 
-	log.Infow("enable https: post request,", "postBody", post)
+	payload := ActivateRequest{}
+	if err := req.ReadEntity(&payload); err != nil {
+		err = fmt.Errorf("activate system: failed to parse activate request: %v", err)
+		klog.Error(err)
+		response.HandleError(resp, err)
+		return
+	}
 
-	if (post.IP != "" && post.EnableReverseProxy) || (post.IP == "" && !post.EnableReverseProxy) {
-		response.HandleError(resp, errors.New("bad request: one of public IP and reverse proxy should be selected"))
+	log.Infow("activate system request", payload)
+
+	if err = userOp.UpdateUser(user, []func(*iamV1alpha2.User){
+		func(u *iamV1alpha2.User) {
+			if payload.Language != "" {
+				u.Annotations[constants.UserLanguage] = payload.Language
+			}
+			if payload.Location != "" {
+				u.Annotations[constants.UserLocation] = payload.Location
+			}
+			if payload.Theme == "" {
+				payload.Theme = "light"
+			}
+			u.Annotations[constants.UserTheme] = payload.Theme
+		},
+	}); err != nil {
+		err = fmt.Errorf("activate system: failed to update user's locale settings: %v", err)
+		klog.Error(err)
+		response.HandleError(resp, err)
 		return
 	}
 
 	reverseProxyConf := &ReverseProxyConfig{}
-	if post.IP != "" {
-		reverseProxyConf.IP = post.IP
-	} else {
-		reverseProxyConf, err = GetDefaultReverseProxyConfig(ctx)
-		if err != nil {
-			response.HandleError(resp, errors.Wrap(err, "failed to get default reverse proxy config"))
-			return
-		}
+	if payload.FRP.Host != "" {
+		reverseProxyConf.EnableFRP = true
+		reverseProxyConf.FRPServer = payload.FRP.Host
+		reverseProxyConf.FRPAuthMethod = FRPAuthMethodJWS
 	}
-
-	if err = reverseProxyConf.Check(); err != nil {
-		response.HandleError(resp, errors.Wrap(err, "invalid reverse proxy configuration"))
-		return
-	}
-
+	// no matter whether the reverse proxy is enabled, we need to persist the configuration
+	// so that the configuration can be fetched by the frontend
+	// and the reverse proxy type can be set, enabling the ip watching mechanism to function normally
 	if err = reverseProxyConf.writeToReverseProxyConfigMap(ctx); err != nil {
-		response.HandleError(resp, errors.Wrap(err, "failed to write reverse proxy configuration"))
+		err = fmt.Errorf("activate system: failed to persist network settings: %v", err)
+		klog.Error(err)
+		response.HandleError(resp, err)
 		return
 	}
 
-	// inputs validated and persisted, now mark the wizard as activating
-	if e := userOp.UpdateUser(user, []func(*iamV1alpha2.User){
+	// all settings persisted, mark the status as activating
+	// to trigger the activation watcher
+	if err = userOp.UpdateUser(user, []func(*iamV1alpha2.User){
 		func(u *iamV1alpha2.User) {
 			u.Annotations[constants.UserTerminusWizardStatus] = string(constants.NetworkActivating)
 		},
-	}); e != nil {
-		klog.Errorf("update user err, %v", err)
-		response.HandleError(resp, errors.Errorf("enable https: update user err, %v", err))
+	}); err != nil {
+		err = fmt.Errorf("activate system: failed to mark status as activating: %v", err)
+		klog.Error(err)
+		response.HandleError(resp, err)
 		return
 	}
 
@@ -267,18 +304,6 @@ func (h *Handler) handleGetReverseProxyConfig(req *restful.Request, resp *restfu
 	}
 	response.Success(resp, conf)
 }
-
-func (h *Handler) handleGetDefaultReverseProxyConfig(req *restful.Request, resp *restful.Response) {
-	ctx := req.Request.Context()
-	conf, err := GetDefaultReverseProxyConfig(ctx)
-	if err != nil {
-		response.HandleError(resp, errors.Wrap(err, "failed to get the default reverse proxy config"))
-		return
-	}
-	response.Success(resp, conf)
-}
-
-// deprecated: task-state endpoint removed
 
 func (h *Handler) handleGetLauncherAccessPolicy(req *restful.Request, resp *restful.Response) {
 	userOp, err := operator.NewUserOperator()

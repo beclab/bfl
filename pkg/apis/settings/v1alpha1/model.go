@@ -92,9 +92,14 @@ type PublicDomainAccessPolicy struct {
 	// AllowedDomains []string `json:"allowed_domains"`
 }
 
-type EnableHTTPSRequest struct {
-	IP                 string `json:"ip"`
-	EnableReverseProxy bool   `json:"enable_reverse_proxy"`
+type ActivateRequest struct {
+	Language string `json:"language"`
+	Location string `json:"location"`
+	Theme    string `json:"theme"`
+	FRP      struct {
+		Host string `json:"host"`
+		JWS  string `json:"jws"`
+	} `json:"frp"`
 }
 
 type TunnelRequest struct {
