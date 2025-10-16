@@ -418,7 +418,7 @@ func (h *Handler) handleOlaresInfo(req *restful.Request, resp *restful.Response)
 		return
 	}
 
-	tInfo.Selfhosted = selfhosted
+	tInfo.EnableReverseProxy = selfhosted
 	tInfo.OsVersion = osVersion
 
 	tInfo.Olaresd = "0"
@@ -445,10 +445,6 @@ func (h *Handler) handleOlaresInfo(req *restful.Request, resp *restful.Response)
 	tInfo.LoginBackground = userOp.GetLoginBackground(user)
 	tInfo.Avatar = userOp.GetAvatar(user)
 	tInfo.UserDID = userOp.GetUserDID(user)
-
-	if reverseProxy := userOp.GetUserAnnotation(user, constants.UserAnnotationReverseProxyType); reverseProxy != "" {
-		tInfo.ReverseProxy = reverseProxy
-	}
 
 	response.Success(resp, tInfo)
 
