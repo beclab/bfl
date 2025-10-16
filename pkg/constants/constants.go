@@ -171,6 +171,8 @@ var (
 
 	UserTerminusWizardStatus = fmt.Sprintf("%s/wizard-status", AnnotationGroup)
 
+	UserTerminusWizardError = fmt.Sprintf("%s/wizard-error", AnnotationGroup)
+
 	UserAvatar = fmt.Sprintf("%s/avatar", AnnotationGroup)
 
 	UserLoginBackground = fmt.Sprintf("%s/login-background", AnnotationGroup)

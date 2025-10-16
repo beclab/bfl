@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
@@ -14,19 +13,15 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/apis"
 	"bytetrade.io/web3os/bfl/pkg/apis/iam/v1alpha1/operator"
 	"bytetrade.io/web3os/bfl/pkg/apiserver/runtime"
-	"bytetrade.io/web3os/bfl/pkg/app_service/v1"
+	app_service "bytetrade.io/web3os/bfl/pkg/app_service/v1"
 	"bytetrade.io/web3os/bfl/pkg/constants"
-	"bytetrade.io/web3os/bfl/pkg/task"
-	settingsTask "bytetrade.io/web3os/bfl/pkg/task/settings"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/utils/certmanager"
 
 	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
-	"github.com/emicklei/go-restful/v3"
+	restful "github.com/emicklei/go-restful/v3"
 	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
-	appsv1 "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 )
@@ -187,68 +182,14 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		return
 	}
 
-	defer func() {
-		if err != nil {
-			if e := userOp.UpdateUser(user, []func(*iamV1alpha2.User){
-				func(u *iamV1alpha2.User) {
-					u.Annotations[constants.UserTerminusWizardStatus] = string(constants.NetworkActivateFailed)
-					u.Annotations[constants.EnableSSLTaskResultAnnotationKey] = settingsTask.TaskResult{State: settingsTask.Failed}.String()
-				},
-			}); e != nil {
-				klog.Errorf("update user err, %v", err)
-			}
-		}
-	}()
-
-	if e := userOp.UpdateUser(user, []func(*iamV1alpha2.User){
-		func(u *iamV1alpha2.User) {
-			u.Annotations[constants.UserTerminusWizardStatus] = string(constants.NetworkActivating)
-		},
-	}); e != nil {
-		klog.Errorf("update user err, %v", err)
+	terminusName = userOp.GetTerminusName(user)
+	if terminusName == "" {
+		response.HandleError(resp, errors.Errorf("no olares name, please ensure olares name is bound first"))
+		return
 	}
-
-	ErrAlreadyEnabled := errors.Errorf("is already enabled")
-	ErrInProgress := errors.Errorf("in progress")
-	err = func() error {
-
-		if user != nil {
-			terminusName = userOp.GetTerminusName(user)
-
-			if terminusName == "" {
-				return errors.Errorf("no olares name, please binding olares name first")
-			}
-
-			if userOp.AnnotationExists(user, constants.UserAnnotationZoneKey) {
-				return ErrAlreadyEnabled
-			}
-
-			if v := userOp.GetUserAnnotation(user, constants.EnableSSLTaskResultAnnotationKey); v != "" {
-				var t settingsTask.TaskResult
-
-				err = json.Unmarshal([]byte(v), &t)
-				if err != nil {
-					return errors.Errorf("unmarshal task result, %v", err)
-				}
-
-				switch t.State {
-				case settingsTask.Pending, settingsTask.Running:
-					return ErrInProgress
-				}
-			}
-		}
-		return nil
-	}()
-
-	if err != nil {
-		if err == ErrAlreadyEnabled || err == ErrInProgress {
-			klog.Warning("duplicate ssl/enable requets, ", err)
-			err = nil
-			response.SuccessNoData(resp)
-			return
-		}
-
-		response.HandleError(resp, errors.Errorf("enable https: %v", err))
+	if userOp.AnnotationExists(user, constants.UserAnnotationZoneKey) {
+		// already enabled, return success idempotently
+		response.SuccessNoData(resp)
 		return
 	}
 
@@ -283,70 +224,17 @@ func (h *Handler) handleEnableHTTPs(req *restful.Request, resp *restful.Response
 		return
 	}
 
-	o := settingsTask.EnableHTTPSTaskOption{
-		Name:                                terminusName,
-		GenerateURL:                         fmt.Sprintf(constants.APIFormatCertGenerateRequest, terminusName),
-		AccessToken:                         req.HeaderParameter(constants.UserAuthorizationTokenKey),
-		ReverseProxyAgentDeploymentName:     ReverseProxyAgentDeploymentName,
-		ReverseProxyAgentDeploymentReplicas: ReverseProxyAgentDeploymentReplicas,
-		L4ProxyDeploymentName:               L4ProxyDeploymentName,
-		L4ProxyDeploymentReplicas:           L4ProxyDeploymentReplicas,
-	}
-
-	// add global l4 proxy
-	namespace := utils.EnvOrDefault("L4_PROXY_NAMESPACE", constants.OSSystemNamespace)
-	serviceAccount := utils.EnvOrDefault("L4_PROXY_SERVICE_ACCOUNT", constants.L4ProxyServiceAccountName)
-
-	token := req.HeaderParameter(constants.UserAuthorizationTokenKey)
-	k8sClient, err := runtime.NewKubeClientWithToken(token)
-	if err != nil {
-		response.HandleError(resp, errors.Wrap(err, "failed to get kube client"))
+	// inputs validated and persisted, now mark the wizard as activating
+	if e := userOp.UpdateUser(user, []func(*iamV1alpha2.User){
+		func(u *iamV1alpha2.User) {
+			u.Annotations[constants.UserTerminusWizardStatus] = string(constants.NetworkActivating)
+		},
+	}); e != nil {
+		klog.Errorf("update user err, %v", err)
+		response.HandleError(resp, errors.Errorf("enable https: update user err, %v", err))
 		return
 	}
 
-	app, err := k8sClient.Kubernetes().AppsV1().Deployments(namespace).Get(ctx, L4ProxyDeploymentName, metav1.GetOptions{})
-	portStr := utils.EnvOrDefault("L4_PROXY_LISTEN", constants.L4ListenSSLPort)
-	if (err != nil && apierrors.IsNotFound(err)) || app == nil {
-		log.Warnf("get l4-proxy deployment err: %v, recreate it", err)
-
-		var portInt int
-		port, _ := strconv.Atoi(portStr)
-		portInt = port
-
-		// create proxy deployment
-		proxyApply := NewL4ProxyDeploymentApplyConfiguration(namespace, serviceAccount, portInt)
-		var createdProxy *appsv1.Deployment
-		createdProxy, err = k8sClient.Kubernetes().AppsV1().Deployments(namespace).Apply(ctx,
-			&proxyApply, metav1.ApplyOptions{Force: true, FieldManager: constants.ApplyPatchFieldManager})
-		if err != nil {
-			response.HandleError(resp, errors.Errorf("enable https: apply l4 proxy deployment err, %v", err))
-			return
-		}
-		log.Debugf("created l4 proxy deployment: %s", utils.PrettyJSON(createdProxy))
-	}
-
-	if err != nil {
-		log.Errorf("get l4-proxy deployment err: %v", err)
-		response.HandleError(resp, errors.Errorf("enable https: get l4 proxy deployment err, %v", err))
-		return
-	}
-
-	o.L4ProxyNamespace = namespace
-
-	log.Info("creating async task to enable https")
-
-	enableHTTPSTask, err := settingsTask.NewEnableHTTPSTask(&o)
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("enable https: new task err, %v", err))
-		return
-	}
-
-	if err = enableHTTPSTask.UpdateTaskState(settingsTask.TaskResult{State: settingsTask.Running}); err != nil {
-		response.HandleError(resp, errors.Errorf("enable https: update task state err, %v", err))
-		return
-	}
-
-	task.LocalTaskQueue.Push("EnableHTTPS", enableHTTPSTask)
 	response.SuccessNoData(resp)
 }
 
@@ -390,15 +278,7 @@ func (h *Handler) handleGetDefaultReverseProxyConfig(req *restful.Request, resp 
 	response.Success(resp, conf)
 }
 
-func (h *Handler) handleGetEnableHTTPSTaskState(req *restful.Request, resp *restful.Response) {
-	name := req.Attribute(constants.UserContextAttribute).(string)
-	t, err := settingsTask.GetEnableHTTPSTaskState(name)
-	if err != nil {
-		response.HandleError(resp, errors.Errorf("get enable https state: %v", err))
-		return
-	}
-	response.Success(resp, t)
-}
+// deprecated: task-state endpoint removed
 
 func (h *Handler) handleGetLauncherAccessPolicy(req *restful.Request, resp *restful.Response) {
 	userOp, err := operator.NewUserOperator()

@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	network_activation "bytetrade.io/web3os/bfl/pkg/watchers/network_activation"
 	"bytetrade.io/web3os/bfl/pkg/watchers/reverse_proxy"
 	"bytetrade.io/web3os/bfl/pkg/watchers/systemenv"
 	corev1 "k8s.io/api/core/v1"
@@ -15,10 +16,10 @@ import (
 	"bytetrade.io/web3os/bfl/pkg/apiserver"
 	"bytetrade.io/web3os/bfl/pkg/constants"
 	"bytetrade.io/web3os/bfl/pkg/signals"
-	"bytetrade.io/web3os/bfl/pkg/task"
 	"bytetrade.io/web3os/bfl/pkg/utils"
 	"bytetrade.io/web3os/bfl/pkg/watchers"
 	"bytetrade.io/web3os/bfl/pkg/watchers/apps"
+	iamV1alpha2 "github.com/beclab/api/iam/v1alpha2"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -92,6 +93,11 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to add reverse proxy watcher: %w", err)
 	}
+	networkActivationSubscriber := network_activation.NewSubscriber(w).WithKubeConfig(config)
+	err = watchers.AddToWatchers[iamV1alpha2.User](w, network_activation.GVR, networkActivationSubscriber.Handler())
+	if err != nil {
+		return fmt.Errorf("failed to add network activation watcher: %w", err)
+	}
 	sysEnvSubscriber := systemenv.NewSubscriber(w)
 	// unstructured
 	err = watchers.AddToWatchers[map[string]interface{}](w, systemenv.GVR, sysEnvSubscriber.Handler())
@@ -101,9 +107,7 @@ func Run() error {
 	log.Info("start watchers")
 	go w.Run(1)
 
-	// tasks
-	log.Info("start task loop")
-	go task.Run()
+	// task loop removed (legacy task queue no longer used)
 
 	// change ip
 	log.Info("watch entrance ip forever")
