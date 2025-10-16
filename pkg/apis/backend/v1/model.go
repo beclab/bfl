@@ -43,17 +43,16 @@ type TerminusInfo struct {
 }
 
 type OlaresInfo struct {
-	OlaresName      string                 `json:"olaresName"`
-	WizardStatus    constants.WizardStatus `json:"wizardStatus"`
-	Selfhosted      bool                   `json:"selfhosted"`
-	TailScaleEnable bool                   `json:"tailScaleEnable"`
-	OsVersion       string                 `json:"osVersion"`
-	LoginBackground string                 `json:"loginBackground"`
-	Avatar          string                 `json:"avatar"`
-	OlaresID        string                 `json:"olaresId"`
-	UserDID         string                 `json:"did"`
-	ReverseProxy    string                 `json:"reverseProxy"`
-	Olaresd         string                 `json:"olaresd"`
+	OlaresName         string                 `json:"olaresName"`
+	WizardStatus       constants.WizardStatus `json:"wizardStatus"`
+	EnableReverseProxy bool                   `json:"enableReverseProxy"`
+	TailScaleEnable    bool                   `json:"tailScaleEnable"`
+	OsVersion          string                 `json:"osVersion"`
+	LoginBackground    string                 `json:"loginBackground"`
+	Avatar             string                 `json:"avatar"`
+	OlaresID           string                 `json:"olaresId"`
+	UserDID            string                 `json:"did"`
+	Olaresd            string                 `json:"olaresd"`
 }
 
 type MyAppsParam struct {
