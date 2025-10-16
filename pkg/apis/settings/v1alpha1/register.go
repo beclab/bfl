@@ -46,10 +46,9 @@ func AddContainer(c *restful.Container) error {
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{}))
 
-	ws.Route(ws.POST("/ssl/enable").
-		To(handler.handleEnableHTTPs).
-		Doc("Enable https.").
-		Param(ws.BodyParameter("body", "ip").Required(false).DataType("json")).
+	ws.Route(ws.POST("/activate").
+		To(handler.handleActivate).
+		Doc("Activate system.").
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{}))
 
@@ -63,12 +62,6 @@ func AddContainer(c *restful.Container) error {
 	ws.Route(ws.GET("/reverse-proxy").
 		To(handler.handleGetReverseProxyConfig).
 		Doc("Get the current reverse proxy settings.").
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Returns(http.StatusOK, "", response.Response{}))
-
-	ws.Route(ws.GET("/default-reverse-proxy").
-		To(handler.handleGetDefaultReverseProxyConfig).
-		Doc("Get the default reverse proxy config, which will be applied at user activation, if reverse proxy is enabled.").
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(http.StatusOK, "", response.Response{}))
 
