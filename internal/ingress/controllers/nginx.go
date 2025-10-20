@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"bytetrade.io/web3os/bfl/internal/ingress/controllers/config"
 	"bytetrade.io/web3os/bfl/pkg/constants"
@@ -64,10 +65,15 @@ func (r *NginxController) genNonAppServers(zone string, isEphemeral bool, langua
 
 func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool, zone string, language string) []config.Server {
 	servers := make([]config.Server, 0)
+	zoneToken := strings.Split(zone, ".")
+	zoneAliases := []string{}
+	if len(zoneToken) > 1 {
+		zoneAliases = append(zoneAliases, fmt.Sprintf("%s.%s", zoneToken[0], "olares.local"))
+	}
 
 	profile := config.Server{
 		Hostname:  zone,
-		Aliases:   []string{},
+		Aliases:   zoneAliases,
 		EnableSSL: true,
 		Locations: []config.Location{
 			{
@@ -77,6 +83,14 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 		},
 		EnableAuth: false,
 		Language:   language,
+	}
+
+	makeLocalHost := func(hostname string) string {
+		hostToken := strings.Split(hostname, ".")
+		if len(hostToken) < 2 {
+			return hostname
+		}
+		return strings.Join([]string{hostToken[0], hostToken[1], "olares", "local"}, ".")
 	}
 
 	formatDomain := func(customPrefixDomain string) []string {
@@ -89,7 +103,7 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 				extAppHostName = fmt.Sprintf("%s-%s.%s", customPrefixDomain, constants.Username, zone)
 			}
 
-			r = append(r, extAppHostName)
+			r = append(r, extAppHostName, makeLocalHost(extAppHostName))
 		}
 		return r
 	}
@@ -140,11 +154,13 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 				appHostname = fmt.Sprintf("%s-%s.%s", prefix, constants.Username, zone)
 			}
 
+			appLocalHost := makeLocalHost(appHostname)
+
 			_, enableOIDC := app.Spec.Settings["oidc.client.id"]
 
 			s := config.Server{
 				Hostname:   appHostname,
-				Aliases:    formatDomain(customPrefixDomainName),
+				Aliases:    append([]string{appLocalHost}, formatDomain(customPrefixDomainName)...),
 				EnableSSL:  true,
 				EnableAuth: true,
 				Locations: []config.Location{
