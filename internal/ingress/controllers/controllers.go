@@ -291,7 +291,7 @@ func (r *NginxController) generateCustomDomainNginxServers() ([]config.CustomSer
 }
 
 func (r *NginxController) generateNginxServers() ([]config.Server, error) {
-	if r.apps == nil || len(r.apps) == 0 {
+	if len(r.apps) == 0 {
 		return nil, fmt.Errorf("current userspace has no applications")
 	}
 
@@ -362,7 +362,7 @@ func (r *NginxController) generateNginxServers() ([]config.Server, error) {
 
 	// For each applications port server
 	for _, app := range r.apps {
-		if app.Spec.Entrances == nil || len(app.Spec.Entrances) == 0 {
+		if len(app.Spec.Entrances) == 0 {
 			klog.Warningf("invalid app %q, ignore it. app=%s", app.Spec.Name, utils.PrettyJSON(app.Spec))
 			continue
 		}

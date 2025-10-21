@@ -25,7 +25,7 @@ _M.NO_AUTH_URIs = { "/", "/login", "/bfl/iam/v1alpha1/login", "/bfl/backend/v1/u
 
 -- add response headers
 _M.ADD_HEADERS = {
-    ["Content-Security-Policy"] = "upgrade-insecure-requests",
+    -- ["Content-Security-Policy"] = "upgrade-insecure-requests",
 }
 
 return _M

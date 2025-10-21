@@ -48,7 +48,7 @@ func (r *NginxController) genNonAppServers(zone string, isEphemeral bool, langua
 
 		servers = append(servers, config.Server{
 			Hostname:   hostname,
-			Aliases:    []string{},
+			Aliases:    []string{r.makeLocalHost(hostname)},
 			EnableAuth: app.AuthEnabled,
 			EnableSSL:  true,
 			Locations: []config.Location{
@@ -85,16 +85,8 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 		Language:   language,
 	}
 
-	makeLocalHost := func(hostname string) string {
-		hostToken := strings.Split(hostname, ".")
-		if len(hostToken) < 2 {
-			return hostname
-		}
-		return strings.Join([]string{hostToken[0], hostToken[1], "olares", "local"}, ".")
-	}
-
 	formatDomain := func(customPrefixDomain string) []string {
-		var r []string
+		var d []string
 
 		if customPrefixDomain != "" {
 			extAppHostName := fmt.Sprintf("%s.%s", customPrefixDomain, zone)
@@ -103,9 +95,9 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 				extAppHostName = fmt.Sprintf("%s-%s.%s", customPrefixDomain, constants.Username, zone)
 			}
 
-			r = append(r, extAppHostName, makeLocalHost(extAppHostName))
+			d = append(d, extAppHostName, r.makeLocalHost(extAppHostName))
 		}
-		return r
+		return d
 	}
 
 	servers = append(servers, profile)
@@ -154,7 +146,7 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 				appHostname = fmt.Sprintf("%s-%s.%s", prefix, constants.Username, zone)
 			}
 
-			appLocalHost := makeLocalHost(appHostname)
+			appLocalHost := r.makeLocalHost(appHostname)
 
 			_, enableOIDC := app.Spec.Settings["oidc.client.id"]
 
@@ -196,4 +188,12 @@ func (r *NginxController) addDomainServers(ctx context.Context, isEphemeral bool
 	}
 
 	return servers
+}
+
+func (r *NginxController) makeLocalHost(hostname string) string {
+	hostToken := strings.Split(hostname, ".")
+	if len(hostToken) < 2 {
+		return hostname
+	}
+	return strings.Join([]string{hostToken[0], hostToken[1], "olares", "local"}, ".")
 }

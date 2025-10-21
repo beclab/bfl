@@ -75,7 +75,9 @@ function _M.overwrite_response_to_https()
     local scheme, url = t[1], t[2]
     ngx.log(ngx.INFO, "parsed url, scheme: ", scheme, ", url: ", url)
     if scheme ~= nil and url ~= nil then
-        if scheme == "http" and url ~= "" then
+        local domain = util.string_split(url, "/")
+        local domainSuffix = "(.*).olares.local$"
+        if scheme == "http" and url ~= "" and not domain[1]:match(domainSuffix) then
             ngx.header["Location"] = "https://" .. url
         end
     end
