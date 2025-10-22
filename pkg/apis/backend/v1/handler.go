@@ -403,7 +403,7 @@ func (h *Handler) handleOlaresInfo(req *restful.Request, resp *restful.Response)
 	}
 
 	tInfo := OlaresInfo{}
-	tInfo.OlaresName = userOp.GetTerminusName(user)
+	tInfo.OlaresID = userOp.GetTerminusName(user)
 
 	status := userOp.GetTerminusStatus(user)
 	if status == "" {
@@ -432,7 +432,7 @@ func (h *Handler) handleOlaresInfo(req *restful.Request, resp *restful.Response)
 		return
 	}
 
-	tInfo.OlaresID = terminusId
+	tInfo.ID = terminusId
 
 	var denyAllAnno string = userOp.GetDenyAllPolicy(user)
 	if denyAllAnno == "" {
