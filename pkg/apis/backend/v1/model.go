@@ -43,14 +43,14 @@ type TerminusInfo struct {
 }
 
 type OlaresInfo struct {
-	OlaresName         string                 `json:"olaresName"`
+	OlaresID           string                 `json:"olaresId"`
 	WizardStatus       constants.WizardStatus `json:"wizardStatus"`
 	EnableReverseProxy bool                   `json:"enableReverseProxy"`
 	TailScaleEnable    bool                   `json:"tailScaleEnable"`
 	OsVersion          string                 `json:"osVersion"`
 	LoginBackground    string                 `json:"loginBackground"`
 	Avatar             string                 `json:"avatar"`
-	OlaresID           string                 `json:"olaresId"`
+	ID                 string                 `json:"id"`
 	UserDID            string                 `json:"did"`
 	Olaresd            string                 `json:"olaresd"`
 }
