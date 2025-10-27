@@ -48,15 +48,6 @@ type certManager struct {
 
 	httpClientTimeout   time.Duration
 	waitGenerateTimeout time.Duration
-
-	// apis
-	apiGenerate                    string
-	apiGenerateStatus              string
-	apiAddDNSRecord                string
-	apiDeleteDNSRecord             string
-	apiDownloadCert                string
-	apiSetCustomDomainOnCloudflare string
-	apiCheckCustomDomainStatus     string
 }
 
 var _ Interface = &certManager{}
@@ -67,23 +58,11 @@ func NewCertManager(terminusName constants.TerminusName) Interface {
 	c.httpClientTimeout = 30 * time.Second
 	c.waitGenerateTimeout = 5 * time.Minute
 
-	// apis
-	c.apiGenerate = fmt.Sprintf(constants.APIFormatCertGenerateRequest, terminusName)
-	c.apiGenerateStatus = fmt.Sprintf(constants.APIFormatCertGenerateStatus, terminusName)
-	c.apiDownloadCert = fmt.Sprintf(constants.APIFormatCertDownload, terminusName)
-
-	c.apiAddDNSRecord = constants.APIDNSAddRecord
-	c.apiDeleteDNSRecord = fmt.Sprintf(constants.APIFormatDNSDeleteRecord, terminusName)
-
-	c.apiSetCustomDomainOnCloudflare = constants.APIDNSAddCustomDomain
-
-	c.apiCheckCustomDomainStatus = constants.APIDNSCheckCustomDomainCname
-
 	return c
 }
 
 func (c *certManager) GenerateCert() error {
-	err := c.request(context.TODO(), "GET", c.apiGenerate, nil, nil)
+	err := c.request(context.TODO(), "GET", fmt.Sprintf(constants.APIFormatCertGenerateRequest, c.terminusName), nil, nil)
 	if err != nil {
 		return err
 	}
@@ -91,7 +70,7 @@ func (c *certManager) GenerateCert() error {
 	t := time.After(c.waitGenerateTimeout)
 
 	for {
-		err = c.request(context.TODO(), "GET", c.apiGenerateStatus, nil, nil)
+		err = c.request(context.TODO(), "GET", fmt.Sprintf(constants.APIFormatCertGenerateStatus, c.terminusName), nil, nil)
 		if err == nil {
 			break
 		}
@@ -109,7 +88,7 @@ func (c *certManager) GenerateCert() error {
 func (c *certManager) DownloadCert() (*ResponseCert, error) {
 	var r ResponseDownloadCert
 
-	err := c.request(context.TODO(), "GET", c.apiDownloadCert, nil, &r)
+	err := c.request(context.TODO(), "GET", fmt.Sprintf(constants.APIFormatCertDownload, c.terminusName), nil, &r)
 	if err != nil {
 		return nil, err
 	}
@@ -130,11 +109,11 @@ func (c *certManager) AddDNSRecord(publicIP, domain *string) error {
 		payload.Domain = *domain
 	}
 
-	return c.request(context.TODO(), "POST", c.apiAddDNSRecord, payload, nil)
+	return c.request(context.TODO(), "POST", constants.APIDNSAddRecord, payload, nil)
 }
 
 func (c *certManager) DeleteDNSRecord() error {
-	return c.request(context.TODO(), "GET", c.apiDeleteDNSRecord, nil, nil)
+	return c.request(context.TODO(), "GET", fmt.Sprintf(constants.APIFormatDNSDeleteRecord, c.terminusName), nil, nil)
 }
 
 func (c *certManager) getCertManagerJWSToken() (string, error) {
@@ -278,7 +257,7 @@ func ValidPemCert(cert string) error {
 func (c *certManager) AddCustomDomainOnCloudflare(customDomain string) (*ResponseCustomDomainStatus, error) {
 	payload := CustomDomainPayload{Name: string(c.terminusName), CustomDomain: customDomain}
 	var r ResponseAddCustomDomain
-	err := c.request(context.TODO(), "POST", c.apiSetCustomDomainOnCloudflare, payload, &r)
+	err := c.request(context.TODO(), "POST", constants.APIDNSAddCustomDomain, payload, &r)
 	if err != nil && !strings.Contains(err.Error(), "409 Conflict") {
 		return nil, err
 	}
@@ -290,7 +269,7 @@ func (c *certManager) GetCustomDomainOnCloudflare(customDomain string) (*Respons
 	defer cancel()
 
 	var r ResponseGetCustomDomain
-	var url = fmt.Sprintf("%s?name=%s&custom-host-name=%s", c.apiSetCustomDomainOnCloudflare, c.terminusName, customDomain)
+	var url = fmt.Sprintf("%s?name=%s&custom-host-name=%s", constants.APIDNSAddCustomDomain, c.terminusName, customDomain)
 	err := c.request(ctx, "GET", url, nil, &r)
 	if err != nil {
 		return nil, err
@@ -301,7 +280,7 @@ func (c *certManager) GetCustomDomainOnCloudflare(customDomain string) (*Respons
 func (c *certManager) DeleteCustomDomainOnCloudflare(customDomain string) (*Response, error) {
 	payload := CustomDomainPayload{Name: string(c.terminusName), CustomDomain: customDomain}
 	var r Response
-	err := c.request(context.Background(), "DELETE", c.apiSetCustomDomainOnCloudflare, payload, &r)
+	err := c.request(context.Background(), "DELETE", constants.APIDNSSetCloudFlareTunnel, payload, &r)
 	if err != nil && !strings.Contains(err.Error(), "The custom hostname was not found") {
 		return nil, err
 	}
@@ -315,7 +294,7 @@ func (c *certManager) GetCustomDomainCnameStatus(customDomain string) (*Response
 	payload := CustomDomainPayload{Name: string(c.terminusName), CustomDomain: customDomain}
 	var r Response
 
-	err := c.request(ctx, "POST", c.apiCheckCustomDomainStatus, payload, &r)
+	err := c.request(ctx, "POST", constants.APIDNSCheckCustomDomainCname, payload, &r)
 	if err != nil && !strings.Contains(err.Error(), "cname configuration error") {
 		return nil, err
 	}
