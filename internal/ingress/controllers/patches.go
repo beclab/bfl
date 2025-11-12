@@ -129,6 +129,7 @@ func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server
 		"/api/paste/",
 		"/api/task/",
 		"/api/repos/",
+		"/seafhttp/upload-aj/",
 	}
 
 	for node := range podMap {
