@@ -377,7 +377,7 @@ func buildHTTPListener(t interface{}, s interface{}) string {
 	return strings.Join(out, "\n")
 }
 
-func buildHTTPSListener(t interface{}, s interface{}) string {
+func buildHTTPSListener(p interface{}, t interface{}, s interface{}) string {
 	var out []string
 
 	tc, ok := t.(config.TemplateConfig)
@@ -392,6 +392,12 @@ func buildHTTPSListener(t interface{}, s interface{}) string {
 		return ""
 	}
 
+	port, ok := p.(int)
+	if !ok {
+		klog.Errorf("expected a 'int' type but %T was returned", p)
+		return ""
+	}
+
 	co := commonListenOptions(tc, hostname)
 
 	addrV4 := []string{""}
@@ -399,7 +405,7 @@ func buildHTTPSListener(t interface{}, s interface{}) string {
 		addrV4 = tc.Cfg.BindAddressIpv4
 	}
 
-	out = append(out, httpsListener(addrV4, co, tc)...)
+	out = append(out, httpsListener(addrV4, co, tc, port)...)
 
 	if !tc.IsIPV6Enabled {
 		return strings.Join(out, "\n")
@@ -410,17 +416,13 @@ func buildHTTPSListener(t interface{}, s interface{}) string {
 		addrV6 = tc.Cfg.BindAddressIpv6
 	}
 
-	out = append(out, httpsListener(addrV6, co, tc)...)
+	out = append(out, httpsListener(addrV6, co, tc, port)...)
 
 	return strings.Join(out, "\n")
 }
 
 func commonListenOptions(template config.TemplateConfig, hostname string) string {
 	var out []string
-
-	if template.Cfg.UseProxyProtocol {
-		out = append(out, "proxy_protocol")
-	}
 
 	if hostname != "_" {
 		return strings.Join(out, " ")
@@ -452,7 +454,6 @@ func httpListener(addresses []string, co string, tc config.TemplateConfig) []str
 		}
 
 		lo = append(lo, co)
-		lo = append(lo, ";")
 		return lo
 	}
 
@@ -469,28 +470,16 @@ func httpListener(addresses []string, co string, tc config.TemplateConfig) []str
 	return out
 }
 
-func httpsListener(addresses []string, co string, tc config.TemplateConfig) []string {
+func httpsListener(addresses []string, co string, tc config.TemplateConfig, port int) []string {
 	out := make([]string, 0)
 
 	fn := func(address string) []string {
 		lo := []string{"listen"}
 
-		if tc.IsSSLPassthroughEnabled {
-			if address == "" {
-				lo = append(lo, fmt.Sprintf("%v", tc.ListenPorts.SSLProxy))
-			} else {
-				lo = append(lo, fmt.Sprintf("%v:%v", address, tc.ListenPorts.SSLProxy))
-			}
-
-			if !strings.Contains(co, "proxy_protocol") {
-				lo = append(lo, "proxy_protocol")
-			}
+		if address == "" {
+			lo = append(lo, fmt.Sprintf("%v", port))
 		} else {
-			if address == "" {
-				lo = append(lo, fmt.Sprintf("%v", tc.ListenPorts.HTTPS))
-			} else {
-				lo = append(lo, fmt.Sprintf("%v:%v", address, tc.ListenPorts.HTTPS))
-			}
+			lo = append(lo, fmt.Sprintf("%v:%v", address, port))
 		}
 
 		lo = append(lo, co)
@@ -500,7 +489,6 @@ func httpsListener(addresses []string, co string, tc config.TemplateConfig) []st
 			lo = append(lo, "http2")
 		}
 
-		lo = append(lo, ";")
 		return lo
 	}
 
