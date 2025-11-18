@@ -212,10 +212,11 @@ http {
         {{- if eq $server.Port 0 -}}
         {{/* +++++ start domain server +++++ */}}
         server_name {{ buildServerName $server.Hostname }} {{ range $server.Aliases }}{{ . }} {{ end }};
-        {{ buildHTTPListener $all $server.Hostname }}
+        {{ buildHTTPListener $all $server.Hostname }};
 
         {{ if $server.EnableSSL }}
-        {{ buildHTTPSListener $all $server.Hostname }}
+        {{ buildHTTPSListener 443 $all $server.Hostname }};
+        {{ buildHTTPSListener 444 $all $server.Hostname }} proxy_protocol;
         ssl_certificate     {{ $all.SSLCertificatePath -}};
         ssl_certificate_key {{ $all.SSLCertificateKeyPath -}};
         ssl_protocols {{ $cfg.SSLProtocols }};
@@ -286,9 +287,9 @@ http {
         proxy_set_header Connection $conn;
 
         {{ if and $server.Hostname $server.EnableAuth }}
-        rewrite_by_lua_block {
-            lua_ingress.force_to_https()
-        }
+        # rewrite_by_lua_block {
+        #    lua_ingress.force_to_https()
+        # }
         access_by_lua_block {
             token_auth.validate()
         }
@@ -340,9 +341,11 @@ http {
         {{/* +++ start server_name, listen and ssl +++ */}}
         {{/* +++++ start domain server +++++ */}}
         server_name {{ buildServerName $server.Hostname }} {{ range $server.Aliases }}{{ . }} {{ end }} ;
+        {{ buildHTTPListener $all $server.Hostname }};
 
         {{ if $server.EnableSSL }}
-        {{ buildHTTPSListener $all $server.Hostname }}
+        {{ buildHTTPSListener 443 $all $server.Hostname }};
+        {{ buildHTTPSListener 444 $all $server.Hostname }} proxy_protocol;
         ssl_certificate     {{ $server.SslCertPath -}};
         ssl_certificate_key {{ $server.SslKeyPath -}};
         ssl_protocols {{ $cfg.SSLProtocols }};
@@ -407,9 +410,9 @@ http {
         proxy_set_header Connection $ws_connection;
 
         {{ if and $server.Hostname $server.EnableAuth }}
-        rewrite_by_lua_block {
-            lua_ingress.force_to_https()
-        }
+        # rewrite_by_lua_block {
+        #    lua_ingress.force_to_https()
+        # }
         access_by_lua_block {
             token_auth.validate()
         }
@@ -444,7 +447,7 @@ http {
     {{ if $all.SSLCertificatePath }}
     ## default https server
     server {
-        listen 443  ssl proxy_protocol default_server;
+        listen 444  ssl proxy_protocol default_server;
 
         ssl_certificate     {{ $all.SSLCertificatePath -}};
         ssl_certificate_key {{ $all.SSLCertificateKeyPath -}};
