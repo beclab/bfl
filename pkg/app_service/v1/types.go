@@ -1,8 +1,9 @@
 package app_service
 
 import (
-	appv1 "bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 	"time"
+
+	appv1 "bytetrade.io/web3os/bfl/internal/ingress/api/app.bytetrade.io/v1alpha1"
 
 	k8sv1 "k8s.io/api/apps/v1"
 )
@@ -26,6 +27,7 @@ type AppInfo struct {
 	IsClusterScoped               bool          `json:"isClusterScoped"`
 	MobileSupported               bool          `json:"mobileSupported"`
 	DefaultThirdLevelDomainConfig string        `json:"defaultThirdLevelDomainConfig"`
+	SharedEntrances               []Entrance    `json:"sharedEntrances,omitempty"`
 }
 
 type Entrance struct {
