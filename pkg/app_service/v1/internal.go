@@ -45,6 +45,7 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 	var res []*AppInfo
 	for _, data := range apps {
 		var appEntrances []Entrance
+		var appSharedEntrances []Entrance
 		appPorts := make([]ServicePort, 0)
 		appACLs := make([]ACL, 0)
 
@@ -150,6 +151,22 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 			}
 		}
 
+		sharedEntrances, ok := appSpec["sharedEntrances"]
+		if ok {
+			entrancesInterface := sharedEntrances.([]interface{})
+			for _, entranceInterface := range entrancesInterface {
+				entranceMap := entranceInterface.(map[string]interface{})
+				var appEntrance Entrance
+				if t, ok := entranceMap["name"]; ok {
+					appEntrance.Name = stringOrEmpty(t)
+				}
+				if t, ok := entranceMap["url"]; ok {
+					appEntrance.URL = stringOrEmpty(t)
+				}
+				appSharedEntrances = append(appSharedEntrances, appEntrance)
+			}
+		}
+
 		ports, ok := appSpec["ports"]
 		if ok {
 			portsInterface := ports.([]interface{})
@@ -224,6 +241,7 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 			MobileSupported:               mobileSupported,
 			RequiredGpu:                   requiredGPU,
 			DefaultThirdLevelDomainConfig: defaultThirdLevelDomainConfig,
+			SharedEntrances:               appSharedEntrances,
 		})
 
 	}
