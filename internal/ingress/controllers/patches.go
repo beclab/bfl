@@ -119,6 +119,7 @@ func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server
 		"/api/permission/cache/",
 		"/api/permission/external/",
 		"/api/task/",
+		"~ ^/api/resources/share/(.*)_",
 	}
 
 	var masterLocation = []string{
@@ -130,6 +131,7 @@ func filesNodeApiPatch(ctx context.Context, r *NginxController, s *config.Server
 		"/api/task/",
 		"/api/repos/",
 		"/seafhttp/",
+		"/api/resources/share/",
 	}
 
 	for node := range podMap {
