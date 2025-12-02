@@ -163,6 +163,20 @@ func (c *Client) getAppListFromData(apps []map[string]interface{}) ([]*AppInfo, 
 				if t, ok := entranceMap["url"]; ok {
 					appEntrance.URL = stringOrEmpty(t)
 				}
+				if t, ok := entranceMap["title"]; ok {
+					appEntrance.Title = stringOrEmpty(t)
+				}
+				if t, ok := entranceMap["icon"]; ok {
+					appEntrance.Icon = stringOrEmpty(t)
+				}
+				if t, ok := entranceMap["invisible"]; ok && t.(bool) == true {
+					appEntrance.Invisible = true
+				}
+				if t, ok := entranceMap["authLevel"]; ok {
+					appEntrance.AuthLevel = stringOrEmpty(t)
+				}
+				// appEntrance.State = state
+
 				appSharedEntrances = append(appSharedEntrances, appEntrance)
 			}
 		}
